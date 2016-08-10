@@ -69,9 +69,24 @@ Usage Notes
 }
 
 OBJ
-  terminal:     "(HoverDroids) FullDuplexSerial"
-  com:          "TwelveSerialPorts128" '32, 128 or 512 mean size of primary RX buffer.
-  aux0_com:     "(HoverDroids) Virtual Microcontroller"
+  'terminal:     "(HoverDroids) FullDuplexSerial"
+  'com:          "TwelveSerialPorts128" '32, 128 or 512 mean size of primary RX buffer.
+  'aux0_com:     "(HoverDroids) Virtual Microcontroller"
+
+OBJ
+  'TODO remove all but the object we want-likely 512
+  'com:"TwelveSerialPorts32"  '32, 128 or 512 mean size of primary RX buffer.
+  com:"TwelveSerialPorts128" '32, 128 or 512 mean size of primary RX buffer.
+  'com:"TwelveSerialPorts512" '32, 128 or 512 mean size of primary RX buffer.
+  terminal: "(HoverDroids) FullDuplexSerial"
+  aux0_com: "(HoverDroids) Virtual Microcontroller"
+
+CON
+  numbuffers  = 1' The number of ports you want up to 12, not including debug port. Port info listed below.
+  buffersize  = com#SECONDARY_BUFFER_SIZE
+  delimchar   = "@" ' address delimiter
+  termichar   = 13  ' packet delimiter
+  termichar2  = 10  ' packet delimiter ... TODO what is this?
 
 CON
   ' 0..11 are the port addresses
@@ -85,17 +100,7 @@ CON
                    ' for devices that don't know about the router, e.g. NMEA devices. 0 disables.
                    ' Do not overlap ports or you'll miss the first stealthed x ports.
 
-CON
-  'TODO Since the number of ports is set in this file, it will be difficult to use as a separate
-  'and independent object
-  numbuffers  = 1' The number of ports you want up to 12, not including debug port. Port info listed below.
-  buffersize  = com#SECONDARY_BUFFER_SIZE
-  delimchar   = "@" ' address delimiter
-  termichar   = 13  ' packet delimiter
-  termichar2  = 10  ' packet delimiter ... TODO what is this?
-
-VAR
-  ' router variables
+VAR  ' router variables
   byte buffer[(buffersize+1)*numbuffers] ' includes padding
   long ptr[numbuffers]
 
