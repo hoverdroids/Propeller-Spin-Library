@@ -69,17 +69,13 @@ Usage Notes
 }
 
 OBJ
-  'terminal:     "(HoverDroids) FullDuplexSerial"
-  'com:          "TwelveSerialPorts128" '32, 128 or 512 mean size of primary RX buffer.
-  'aux0_com:     "(HoverDroids) Virtual Microcontroller"
-
-OBJ
   'TODO remove all but the object we want-likely 512
   'com:"TwelveSerialPorts32"  '32, 128 or 512 mean size of primary RX buffer.
   com:"TwelveSerialPorts128" '32, 128 or 512 mean size of primary RX buffer.
   'com:"TwelveSerialPorts512" '32, 128 or 512 mean size of primary RX buffer.
   terminal: "(HoverDroids) FullDuplexSerial"
   aux0_com: "(HoverDroids) Virtual Microcontroller"
+  device14: "tCubed Device14"
 
 CON
   numbuffers  = 1' The number of ports you want up to 12, not including debug port. Port info listed below.
@@ -191,118 +187,14 @@ CON
 '
 ' =================================================================================================
 
-PUB aux0_Activities|char1
-  ' auxilliary cog loop cycle (gets looped by aux0_loop). You can treat this as its own microcontroller basically.
-  'if this PUB and the next are telling the truth, this may be where my code goes after not starting certain ports
-  'since those pins are not for ports; should also mean that this virtual microcontroller should be able to react based on info
-  'that it was sent; also, if each port can address the others, the XBee data should go right to the ASD and vice versa-if I can figure out how
-  'since the Xbee will send the @addres yadayada as a string once the delimiter is sent (right?)
-  'dira[27]:=1
-
-  'TODO always allow the terminal to request the number of cogs
-  'and show the number on startup
-
-  ''repeat 'don't use without a condition else it blocks
-  'TODO for some reason, this method seems not to be activated until a message is first sent to device 14
-  'if (aux0_rxflag)              'Ensure that there is a buffer item to compare with otherwise it blocks
-    if aux0_buffer_rx[0]=="A" 'note that the aux0_buffer_rx does not get reset until a new message is received;also, the buffer does not include the address
-      aux0_com.str(string("@12@Oi you...terminal, why A?")) 'Add a test string to the virtual controller's tx buffer
-      aux0_txflag~~
-    'outa[27]:=1
-    'waitcnt(clkfreq+cnt)
-    'outa[27]:=0
-  'waitcnt(clkfreq+cnt)
-  'aux0_com.str(string("@00@test")) 'Add a test string to the virtual controller's tx buffer
-  'aux0_com.str(string("Helllo"))
-  'aux0_txflag~~                    'Transmit the string in the virtual controller's tx buffer
-'use the following for a passthrough...nothing is required since that can be set by default
-
-  'Virtual Microcontroller (VuC) is used below
-
-  'After first starting the VuC, indicate that it's up and running
-  'if aux0_started == 0
-    aux0_started:=1                  'indicate that the message shouldn't be shown again
-    aux0_com.str(string("Virtual Microcontroller"))' (VuC) is now running
-    aux0_txflag~~                    'Transmit the string in the virtual controller's tx buffer
-    waitcnt(clkfreq+cnt)
-    aux0_com.str(string(13))
-    aux0_txflag~~
-    waitcnt(clkfreq+cnt)
-  'Reset the Propeller and the serial Terminal will display the message below:
-  '@14@Virtual Microcontroller (VuC) is now running@
-  'This message shows:
-  '@some_number: the device #sending transmission. VuC is device number 14
-  '@some_string@: the data that was sent
-  'TODO oddly, the above message is the same whether bigbrother is 1 or 2
-
-  'The following indicates that device 13, the router, sent a message to device 14, the VuC
-  'but doesn't indicate what the data was
-  '@13>14@                      '13 sends something to 14
-  '@14>13@                      '14 sends something to 13
-
-  'The following indicates that device 14 was busy when it received message
-  'TODO ... or, does it mean device 14 was sent the message busy?
-  'This is actually busy because we were sending something to the router while the router
-  'is processing-and since it's processing the message that was just sent to it, it's busy!
-  ' @14@BUSY@
-
-
-    'Now send to terminal, just to see what happens
-    aux0_com.str(string("@12@Yo Terminal, this is 14"))
-    aux0_txflag~~
-    'And now send to router, just to see what happens
-
-    'Finally, send to each device number to see what happens
-    waitcnt(clkfreq*5+cnt)
-
-  'TODO how to send data to 14 to be processed? I keep getting errors
-
-  'TODO how to use stealth?
-
-  'TODO FYI when the default route from terminal is router, then there's no need to prefix @13@
-
-  'TODO show how to send messages to the router from the serial terminal
-  '@13@L0         Turn logging off
-  '@13@L1         Turn logging on; only show inter-device comms
-  '@13@L2         Turn logging off; show inter-device comms and data
-  '@13@R          Reboot the router
-  '@13@D00>D01    Set the default route from device 0 to device 1; ie automatically forward data received on device
-  '               00 RX to device 01 RX
-
-  'TODO notice that aux busy error means the VuC is processing the received packet; see aux0_loop method
-
-  'There should be a mirroring effect from big brother based on the settings...what to do about it
-
-
-  'This method is already being called in an infinite loop from the aux0_loop method.
-  'So, let's just determine if something is in the virtual microcontroller's (VuC) RX buffer.
-  'If so, let the debug port know
-
-  'TODO The remaining task is to figure out why sending data to 14 is coming back with an error
-
-PUB aux0_ReactToPacket'(PacketAddr,FromWhere)
-  ' auxilliary cog function called when the virtual internal serial port got something.
-  ' aux0_buffer_rx contains it and aux0_lastorigin says where it's from.
-
-  'In the original Serial Router Example, called Nasa Router Firmware Example 12sp, this code
-  'had a repeat loop that simply showed okstr..error...okstr...error...okstr Since the code didn't
-  'really do anything it was gutted.
-
-  'Include code here if you'd like to respond to data when it comes in. Otherwise, add it under
-  'aux0_Activities
-  'Also, no need to check if buffer has data since this method is only called when data is received
-  if aux0_buffer_rx[0]=="A" 'note that the aux0_buffer_rx does not get reset until a new message is received;also, the buffer does not include the address
-    aux0_com.str(string("@12@Oi you...terminal, why A?")) 'Add a test string to the virtual controller's tx buffer
-    aux0_txflag~~
-
 PRI aux0_loop ' auxiliary cog function. Should not need modifications.
 
   repeat
-    aux0_Activities  'the aux0_Activity will keep looping even though there are no received packets; the buffer is updated when a new message comes in
+    device14.aux0_Activities  'the aux0_Activity will keep looping even though there are no received packets; the buffer is updated when a new message comes in
     if (aux0_rxflag) ' we got something in buffer
       aux0_rxflag~
       aux0_busyflag~~
-      aux0_ReactToPacket'(@aux0_buffer_rx,aux0_lastorigin)
+      device14.aux0_ReactToPacket'(@aux0_buffer_rx,aux0_lastorigin)
       aux0_busyflag~
   cogstop(aux0_cog~ - 1)
 
