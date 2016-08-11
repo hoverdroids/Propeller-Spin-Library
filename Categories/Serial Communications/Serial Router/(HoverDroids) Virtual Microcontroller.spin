@@ -19,25 +19,33 @@
 
 ======================================================================
 
-   File...... (HoverDroids)Virtual Microcontroller
-   Purpose... TODO
+   File......
+   Purpose...
    Author.... Chris Sprague
    E-mail.... HoverDroids@gmail.com
-   Started... 08 09 2016
-   Updates... 08 09 2016
+   Started... MM DD YYYY
+   Updates... MM DD YYYY
    
 ======================================================================
 
 ----------------------------------------------------------------------
 Derived from 
 ----------------------------------------------------------------------
-  (REF1)  OBEX\Serial Router\stringoutput_external_buffer
+  (REF1)  SpinObject1
+  (REF2)  SpinObject2
+  (REF3)  SpinObject3
 
+  Different usage of references in code are list off the right side of the screen
+  with the following format:
+
+  [X]REF1 [ ]REF3               A version of the method is in found in
+                                REF1 & REF3. The REF1 is used instead.
+  [+]REF3                       REF3 has added this line vs other versions
+  [-]REF1                       REF1 has removed this line vs other versions
+  [M]REF1                       REF1 has modified this line vs other versions
 ----------------------------------------------------------------------
 Program Description
 ----------------------------------------------------------------------
-  This acts like a virtual microcontroller when being used by the
-  Serial Router
 
 ----------------------------------------------------------------------
 Usage
@@ -45,10 +53,10 @@ Usage
   To use this object in your code, declare it as shown below:
 
   OBJ
-  vmc:"Virtual Microcontroller"
+  objNickName:"Object Name"
 
   SomeMethod
-  vmc.vmcMethod(input1,...,inputN)
+  objNickName.objMethod(input1,...,inputN)
 
 ----------------------------------------------------------------------
 Usage Notes
@@ -69,194 +77,138 @@ Usage Notes
   Hence, this aggregation of code will certainly increase the size of your
   binary to an unnecessary degree.
 }
+
+
+
+CON
+'TODO add this as the description of this object
+' =================================================================================================
+'
+' Auxilliary cog functions here.
+' This can be treated pretty much like a normal standalone microcontroller.
+' Exception:
+'       use aux0_com for serial output and, to xmit,
+'       do aux0_txflag~~
+'       for serial receive, use reacttopacket
+'       and read aux0_buffer_rx.
+'
+' Note that a blocking function is OK and will not impair the rest of the router! (see example)
+'
+' =================================================================================================
+
+OBJ
+  terminal: "(HoverDroids) FullDuplexSerial"
+  vmc_tx: "(HoverDroids) Virtual Microcontroller TX Buffer"
+
+CON
+
+  ' The number of ports you want to use, up to 12, not including debug port. Port info listed below,
+  ' It's best to set the input and output pins to -1 to indicate the pins aren't being used, but only
+  ' numbuffers indicates the number of buffers to use. ie if numbuffers = 2 and port1 has pins=-1, an
+  ' error will be thrown and if numbuffers = 1 and port1 has valid pins, only port1 will be used.
+  ' MUST be in CON block...it's referenced by the Serial Router
+  numbuffers = 1
+
 VAR
-  'From REF1
-  long bufptr
-  long bufaddr
-  long bufsize
+  long addr_txflag
+  long addr_rx
 
-PUB init(BufferAddress,BufferSize)                                              'From REF1
+PUB start(addr_vmc_rxbuffer, addr_vmc_buffer_tx, buffersize, addr_vmc_txflag)
+  'Just a test...REMOVE
+  'vmc_tx.str(string("@12@start vmc1"))
+
+  addr_txflag:=addr_vmc_txflag    'Save the reference to the txflag in order to transmit data from any method here
+
+  addr_rx:=addr_vmc_rxbuffer  'Save the referece to the rx buffer in order to read from it from any method
+
+  terminal.start(byte[@inputpins+12],byte[@outputpins+12],byte[@inversions+12],long[@baudrates+12*4])    ' high speed port gets special treatment (update: should it?)
+
+  vmc_tx.init(addr_vmc_buffer_tx,buffersize) ' virtual com port for aux0_ device
+
+  vmc_tx.str(string("@12@start vmc2"))
+  byte[addr_vmc_txflag]~~'[0]:=1
+
+PUB aux0_Activities|char1
 {
-  Descr : Call this method from your main code before using this object. It will initialize
-          the output buffer that is used for transmitting data from the this Virtual uController
-          to other serial devices.
-          Trashes bigstring, so be careful
+  This is where your main code should go, except for reactions to received packets. Put those
+  in aux_ReactToPacket instead.
 
-  Input : string1addr:the address of the first byte of the first string
-          string2addr:the address of the first byte of the second string
+  Note: This is passing the address of the transmit flag, not the flag itself. This is because
+        the Serial Router is monitoring a specific value in memory and not the changing of the
+        value that is passed into this method.
 
-  Return: The address of the concatenated string in the buffer
+        So, use byte[@addr_aux0_txflag]~~ to tell the Serial Router to transmit the TX Buffer
+
+  EX. Use of transmitting data from the Virtual Microcontroller
+  vmc_tx.str(String("YourString"))                      'set string in tx buffer
+  byte[@addr_aux0_txflag]~~                             'tell the Serial Router to send whatever is in the TX Buffer
+
+byte[@MyStr][0]
 }
-  bufptr~
-  bufaddr:=BufferAddress
-  if (BufferSize < 0)
-    bufsize:=strsize(BufferAddress) ' try to autodetect
-  else
-    bufsize:=BufferSize
-  zap(0)
+  'vmc_tx.str(string("@12@Hello"))
+  'byte[@addr_txflag]~~
+  'vmc_tx.str(string("@12@activity"))
+  'byte[@addr_txflag][0]:=1
+  'waitcnt(clkfreq*2+cnt)
 
-PUB string_concat(string1addr, string2addr)                                     'From REF1
+  vmc_tx.str(string("@12@Activity",13))
+  byte[addr_txflag]~~
+  waitcnt(clkfreq*2+cnt)
+
+PUB aux0_ReactToPacket'(PacketAddr,FromWhere)
 {
-  Descr : Concatenate string2 onto string1.
-          Trashes bigstring, so be careful
-
-  Input : string1addr:the address of the first byte of the first string
-          string2addr:the address of the first byte of the second string
-
-  Return: The address of the concatenated string in the buffer
+This is where your code should react to data that is received.
 }
-  result := strsize(string1addr)
-  bytemove(bufaddr, string1addr, result)
-  bytemove(bufaddr[result], string2addr, strsize(string2addr) + 1)
-  result := bufaddr
-  return
+  vmc_tx.str(string("@12@React",13))
+  byte[addr_txflag]~~
+  'byte[@addr_txflag][0]:=1
 
-PUB substring(string1addr, length)                                              'From REF1
-{
-  Descr : Copy part of string1 to the buffer. This will then terminate the substring
-          with a zero as required by most methods.
-          Trashes bigstring, careful.
+PUB addr_inputpins
+  return @inputpins
 
-  Input : string1addr:the address of the first byte of the string to start copying
-          length:the number of characters to copy from the first byte copied
+PUB addr_outputpins
+  return @outputpins
 
-  Return: The address of the resulting string in the buffer
-}
-  bytemove(bufaddr, string1addr, length)
-  byte[bufaddr+length] := 0 ' cap the string
-  result := bufaddr
+PUB addr_baudrates
+  return @baudrates
 
-PUB tx(txbyte)                                                                  'From REF1
-{
-  Descr : Add a single byte to the transmit buffer and advance the end-of-buffer pointer.
-          This will add a single byte to the buffer and advance the end-of-buffer pointer only
-          if buffer is not full. If it's full, the byte is not added.
+PUB addr_inversions
+  return @inversions
 
-  Input : txbyte:The byte to be added to the buffer
+PUB addr_defaultroute
+  return @defaultroute
 
-  Return: True if out of buffer space; false otherwise.
-}
-  if (bufptr => bufsize)
-    return true            'TODO what should we do here?
-  byte[bufaddr+bufptr++]:=txbyte
-  return false
+PUB rxcheck
+  return terminal.rxcheck
 
-PUB zap(how)                                                                    'From REF1
-{
-  Descr : Fill the entire buffer with the same byte.
-          Always set the last position to 0 to remain compatible with other string functions.
+PUB zap(how)
+  return vmc_tx.zap(how)
 
-  Input : how:The byte to use when filling all bytes of the buffer
+PUB tx(txbyte)
+  return terminal.tx(txbyte)
 
-  Return: False...always...Chris doesn't know why TODO
-}
-  bytefill(bufaddr,how,bufsize)'how,bufsize)
-  'byte[bufaddr+bufsize-1]~
-  bufptr~
-  return false
+DAT
+  'Here is the device number breakdown for the router
+        '
+        'Device 0 - 11 : Physical devices ... that are attached to physical pins
+        '              : Do NOT use 30 & 31 for physical devices unless you know what you're doing!!!
+        'Device 12     : Terminal ... to interface with developer
+        'Device 13     : Router   ... data sent here can be used to configure the router or relaying data to other devices
+        'Device 14     : The Virtual Microcontroller ... ie a project's main interface for interacting with other devices
 
-PUB remaining                                                                    'From REF1
-{
-  Descr : Get the number of bytes remaining in the tx buffer
+  'Here is the device number breakdown when stealth mask is used. Stealth masking means that device router
+  'heading are removed before sending to a given device so that only the data is sent. This allows devices
+  'that don't know about the router to transfer data over the serial router
+  '
+        'Device 50 - 61: Physical devices
+        'Device 62     : Terminal
+        'Device 63     : Router
+        'Device 64     : The Virtual Microcontroller
 
-  Input : N/A
-
-  Return: The number of bytes remaining in the tx buffer
-}
-  return bufsize-bufptr
-
-PUB buf                                                                         'From REF1
-{
-  Descr : Get the buffer address; ie the address of the first byte in memory that is reserved
-          for the tx buffer
-
-  Input : N/A
-
-  Return: The address of the first byte of the tx buffer
-}
-  return bufaddr
-
-PUB str(stringptr)                                                              'From REF1
-{
-  Descr : Add a string to the tx buffer.
-          This does not actually transmit the string.
-
-  Input : stringptr:The pointer to a ZERO TERMINATED string
-
-  Return: True if out of buffer space; false otherwise
-}
-  'Exit with the size of the string if the string's first byte is zero
-  result := strsize(stringptr)
-  if byte[stringptr] == 0
-    return
-
-  'The first byte of the string is not zero, so add every possible byte
-  'to the tx buffer
-  repeat result
-    if tx(byte[stringptr++])
-      return true
-  return false
-
-PUB dec(value) | i, x                                                           'From REF1
-{
-  Descr : Convert a value to its decimal representation and add that representation
-          to the tx buffer
-
-  Input : value:Any value
-
-  Return: True if out of buffer space; false otherwise
-}
-  x := value == NEGX                                                            'Check for max negative
-  if value < 0
-    value := ||(value+x)                                                        'If negative, make positive; adjust for max negative
-    tx("-")                                                                     'and output sign
-
-  i := 1_000_000_000                                                            'Initialize divisor
-
-  repeat 10                                                                     'Loop for 10 digits
-    if value => i
-      if tx(value / i + "0" + x*(i == 1))
-        return true                                          'If non-zero digit, output digit; adjust for max negative
-      value //= i                                                               'and digit from value
-      result~~                                                                  'flag non-zero found
-    elseif result or i == 1
-      if tx("0")
-        return true                                                                'If zero digit (or only digit) output it
-    i /= 10                                                                     'Update divisor
-
-  return false
-
-PUB hex(value, digits)                                                          'From REF1
-{
-  Descr : Convert a value to its hex representation and add that representation
-          to the tx buffer
-
-  Input : value:Any value
-          digits: The number of digits to print (e.g. 2 digits shows FF)
-
-  Return: True if out of buffer space; false otherwise
-}
-
-  value <<= (8 - digits) << 2
-  repeat digits
-    if tx(lookupz((value <-= 4) & $F : "0".."9", "A".."F"))
-       return true
-  return false
-
-PUB bin(value, digits)                                                          'From REF1
-{
-  Descr : Convert a value to its binary representation and add that representation
-          to the tx buffer
-
-  Input : value:Any value
-          digits: The number of digits to print (e.g. 2 digits shows 10)
-
-  Return: True if out of buffer space; false otherwise
-}
-
-  value <<= 32 - digits
-  repeat digits
-    if tx((value <-= 1) & 1 + "0")
-       return true
-  return false
+  'Device num         0      1       2      3      4       5     6     7      8      9      10     11     term      device num
+  inputpins      byte 14,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    31      ' Hardware input pin
+  outputpins     byte 15,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    30      ' Hardware output pin
+  inversions     byte %0000, %0000, %0000, %0000, %0000, %0011, %0011, %0011, %0011, %0011, %0011, %0011, %0000   ' Signal flags (open collector, inversion etc.)
+  baudrates      long 9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  115200  ' Baud rate
+  defaultroute   byte 12,    12,    12,    12,    12,    12,    12,    12,    12,    12,    12,    12,    13      ' Default route for each port
 
