@@ -36,6 +36,9 @@ Derived from
   (REF2)  FullDuplexSerialPlus
   (REF3)  OBEX\Serial Router\FullDuplexSerialExt
   (REF4)  FullDuplexSerial64
+  (REF5)  FullDuplexSerial_rr004
+  (REF6)  Parallax Serial Terminal
+  (REF7)  pcFullDuplexSerial
 
   Different usage of references in code are list off the right side of the screen
   with the following format:

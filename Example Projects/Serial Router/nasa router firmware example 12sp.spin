@@ -1,3 +1,4 @@
+''SOURCE: http://obex.parallax.com/object/520
 CON
                                                                                                                               
         _clkmode                = xtal1 + pll16x
