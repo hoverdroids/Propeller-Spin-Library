@@ -69,7 +69,7 @@ Usage Notes
 }
 
 OBJ
-  com   : "TwelveSerialPorts128"        '32, 128 or 512 mean size of primary RX buffer.
+  com   : "TwelveSerialPorts512"        'Sets size of primary RX buffer.
   utils : "(HoverDroids) Serial Router Utils"
   vmc   : "(HoverDroids) Virtual Microcontroller"
 

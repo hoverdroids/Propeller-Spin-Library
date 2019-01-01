@@ -19,44 +19,28 @@
 
 ======================================================================
 
-   File......
-   Purpose...
+   File...... (HoverDroids) Serial Router Main
+   Purpose... The top-level object for projects using the HoverDroids
+              Serial Router
    Author.... Chris Sprague
    E-mail.... HoverDroids@gmail.com
-   Started... MM DD YYYY
-   Updates... MM DD YYYY
+   Started... 08 11 2016
+   Updates... 08 11 2016
    
 ======================================================================
 
 ----------------------------------------------------------------------
-Derived from 
-----------------------------------------------------------------------
-  (REF1)  SpinObject1
-  (REF2)  SpinObject2
-  (REF3)  SpinObject3
-
-  Different usage of references in code are list off the right side of the screen
-  with the following format:
-
-  [X]REF1 [ ]REF3               A version of the method is in found in
-                                REF1 & REF3. The REF1 is used instead.
-  [+]REF3                       REF3 has added this line vs other versions
-  [-]REF1                       REF1 has removed this line vs other versions
-  [M]REF1                       REF1 has modified this line vs other versions
-----------------------------------------------------------------------
 Program Description
 ----------------------------------------------------------------------
+  This is the top level object for this projects using the HoverDroids
+  Serial Router.
 
-----------------------------------------------------------------------
-Usage
-----------------------------------------------------------------------
-  To use this object in your code, declare it as shown below:
+  While you may add code in the Main method below, it is not advised.
+  Instead, add your code to the init, Main, and ReactToPacket methods
+  in the (HoverDroids) Serial Router Virtual Microcontroller object
+  by following the instruction on the following page:
 
-  OBJ
-  objNickName:"Object Name"
-
-  SomeMethod
-  objNickName.objMethod(input1,...,inputN)
+  http:\\HoverDroids.github.io\Serial Router Demo
 
 ----------------------------------------------------------------------
 Usage Notes
@@ -78,34 +62,33 @@ Usage Notes
   binary to an unnecessary degree.
 }
 
-CON
-  _clkmode = xtal1 + pll16x     'Standard clock mode * crystal frequency = 80 MHz
-  _xinfreq = 5_000_000          'Only use with a 5MHz crystal
+'' =================================================================================================
+''
+''   File....... tCubed Firmware.spin
+''   Purpose.... The main firmware for tCubed
+''   Author..... Christopher Sprague
+''               Copyright (c) 2016 tCubed
+''               -- see below for terms of use
+''   E-mail..... chris@playtCubed.com
+''   Started.... 24 July 2016
+''   Updated....
+''   Version 0.1
+''
+'' =================================================================================================
+'Info
+'This object is the main object. It allows a debug port on pins 30/31 and connects to a Bluetooth
+'module on 14 and 15. The Debug monitor can show data between serial ports, nothing, or data and
+'packets. To set which function is used, set the bigbrother constant in DAT to 0,1, or 2
+'To add/remove serial ports, modify devices in the DAT section.
 
-VAR
-  long  symbol
-   
+'TODO talk about the effect of the stealthmask
+
 OBJ
-  nickname      : "object_name"
-  
-PUB public_method_name
-{
-  Descr : ...
+  router: "(HoverDroids) Serial Router with 128Byte Buffers"
 
-  Input : ...
+CON
+  _clkmode = xtal1 + pll16x                             'Standard clock mode * crystal frequency = 80 MHz
+  _xinfreq = 5_000_000                                  'Using 5MHz crystal
 
-  Return: ...
-}
-
-PRI private_method_name
-{
-  Descr : ...
-
-  Input : ...
-
-  Return: ...
-}
-
-DAT
-name    byte  "string_data",0       '
-        
+PUB Main
+  router.start

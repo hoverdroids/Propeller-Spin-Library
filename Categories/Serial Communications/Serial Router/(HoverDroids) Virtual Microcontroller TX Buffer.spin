@@ -74,8 +74,9 @@ VAR
   long bufptr
   long bufaddr
   long bufsize
+  long addr_txflag
 
-PUB init(BufferAddress,BufferSize)                                              'From REF1
+PUB init(BufferAddress, BufferSize, addr_tx_flag)                                              'From REF1
 {
   Descr : Call this method from your main code before using this object. It will initialize
           the output buffer that is used for transmitting data from the this Virtual uController
@@ -87,6 +88,10 @@ PUB init(BufferAddress,BufferSize)                                              
 
   Return: The address of the concatenated string in the buffer
 }
+  'Save this address in oder to indicate the the tx buffer should be transmitted by the Serial
+  'Router during the next transmission cycle
+  addr_txflag:=addr_tx_flag
+
   bufptr~
   bufaddr:=BufferAddress
   if (BufferSize < 0)
@@ -178,8 +183,8 @@ PUB buf                                                                         
 
 PUB str(stringptr)                                                              'From REF1
 {
-  Descr : Add a string to the tx buffer.
-          This does not actually transmit the string.
+  Descr : Add a ZERO TERMINATED string to the tx buffer, without sending it.
+          String(""): it's also possible to pass String("your string")
 
   Input : stringptr:The pointer to a ZERO TERMINATED string
 
@@ -197,12 +202,28 @@ PUB str(stringptr)                                                              
       return true
   return false
 
+PUB sendStr(stringptr)
+{
+  Descr : Add a ZERO TERMINATED string to the tx buffer. Then indicate to the
+          Serial Router that the tx buffer should be transmitted during the next
+          transmission cycle.
+          String(""): it's also possible to pass String("your string")
+
+  Input : stringptr:The pointer to a ZERO TERMINATED string
+
+  Return: True if out of buffer space; false otherwise
+}
+  result:=str(stringptr)
+  send
+  return result
+
 PUB dec(value) | i, x                                                           'From REF1
 {
   Descr : Convert a value to its decimal representation and add that representation
-          to the tx buffer
+          to the tx buffer,without sending it. This is useful for gradually
+          buiding the data in the output buffer
 
-  Input : value:Any value
+  Input : value:The value to be converted to a decimal string
 
   Return: True if out of buffer space; false otherwise
 }
@@ -216,7 +237,7 @@ PUB dec(value) | i, x                                                           
   repeat 10                                                                     'Loop for 10 digits
     if value => i
       if tx(value / i + "0" + x*(i == 1))
-        return true                                          'If non-zero digit, output digit; adjust for max negative
+        return true                                                             'If non-zero digit, output digit; adjust for max negative
       value //= i                                                               'and digit from value
       result~~                                                                  'flag non-zero found
     elseif result or i == 1
@@ -226,12 +247,27 @@ PUB dec(value) | i, x                                                           
 
   return false
 
+PRI sendDec(value)
+{
+  Descr : Convert a value to its decimal representation and add that representation
+          to the tx buffer. Then indicate to the Serial Router that the tx buffer
+          should be transmitted during the next transmission cycle
+
+  Input : value:The value to be converted to a decimal string
+
+  Return: True if out of buffer space; false otherwise
+}
+  result:=dec(value)
+  send
+  return result
+
 PUB hex(value, digits)                                                          'From REF1
 {
   Descr : Convert a value to its hex representation and add that representation
-          to the tx buffer
+          to the tx buffer,without sending it. This is useful for gradually
+          buiding the data in the output buffer
 
-  Input : value:Any value
+  Input : value:The value to be converted to a hex string
           digits: The number of digits to print (e.g. 2 digits shows FF)
 
   Return: True if out of buffer space; false otherwise
@@ -243,20 +279,61 @@ PUB hex(value, digits)                                                          
        return true
   return false
 
+PRI sendHex(value,digits)
+{
+  Descr : Convert a value to its hex representation and add that representation
+          to the tx buffer. Then indicate to the Serial Router that the tx buffer
+          should be transmitted during the next transmission cycle
+
+  Input : value:The value to be converted to a hex string
+          digits: The number of digits to print (e.g. 2 digits shows FF)
+
+  Return: True if out of buffer space; false otherwise
+}
+  result:=hex(value, digits)
+  send
+  return result
+
 PUB bin(value, digits)                                                          'From REF1
 {
   Descr : Convert a value to its binary representation and add that representation
-          to the tx buffer
+          to the tx buffer,without sending it. This is useful for gradually buiding
+          the data in the output buffer
 
-  Input : value:Any value
+  Input : value:the value to be converted to binary string
           digits: The number of digits to print (e.g. 2 digits shows 10)
 
   Return: True if out of buffer space; false otherwise
 }
-
   value <<= 32 - digits
   repeat digits
     if tx((value <-= 1) & 1 + "0")
        return true
   return false
+
+PUB sendBin(value, digits)
+{
+  Descr : Convert a value to its binary representation and add that representation
+          to the tx buffer. Then indicate to the Serial Router that the tx buffer
+          should be transmitted during the next transmission cycle
+
+  Input : value:the value to be converted to binary string
+          digits: The number of digits to print (e.g. 2 digits shows 10)
+
+  Return: True if out of buffer space; false otherwise
+}
+  result:=bin(value, digits)
+  send
+  return result
+
+PUB send
+{
+  Descr : Indicate to the Serial Router that the tx buffer
+          should be transmitted during the next transmission cycle
+
+  Input : N/A
+
+  Return: N/A
+}
+  byte[addr_txflag]~~
 

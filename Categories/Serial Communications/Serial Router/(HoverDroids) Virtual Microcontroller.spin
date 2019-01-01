@@ -110,25 +110,40 @@ CON
   numbuffers = 1
 
 VAR
-  long addr_txflag
   long addr_rx
+  long buffersize
 
-PUB start(addr_vmc_rxbuffer, addr_vmc_buffer_tx, buffersize, addr_vmc_txflag)
-  'Just a test...REMOVE
-  'vmc_tx.str(string("@12@start vmc1"))
-
-  addr_txflag:=addr_vmc_txflag    'Save the reference to the txflag in order to transmit data from any method here
+PUB start(addr_vmc_rxbuffer, addr_vmc_buffer_tx, buffer_size, addr_vmc_txflag)
 
   addr_rx:=addr_vmc_rxbuffer  'Save the referece to the rx buffer in order to read from it from any method
+  buffersize:=buffer_size
 
   terminal.start(byte[@inputpins+12],byte[@outputpins+12],byte[@inversions+12],long[@baudrates+12*4])    ' high speed port gets special treatment (update: should it?)
+  vmc_tx.init(addr_vmc_buffer_tx, buffer_size, addr_vmc_txflag) ' virtual com port for aux0_ device
 
-  vmc_tx.init(addr_vmc_buffer_tx,buffersize) ' virtual com port for aux0_ device
+  init
 
-  vmc_tx.str(string("@12@start vmc2"))
-  byte[addr_vmc_txflag]~~'[0]:=1
+PRI init
+{
+  If you'd like to initialize the device pins, baud, inversions, and default routes, it's
+  best to do it here or in DAT.
 
-PUB aux0_Activities|char1
+  But, if you must configure it here, do something like the following:
+
+
+
+  '
+
+}
+  'For all other other router settings, the following can be used:
+  'Set the output level to 2, ie
+
+  'Set router to show inter-device communications AND data
+  vmc_tx.sendStr(String("@14@L2"))
+
+  'Set router
+
+PUB Main|char1
 {
   This is where your main code should go, except for reactions to received packets. Put those
   in aux_ReactToPacket instead.
@@ -145,23 +160,89 @@ PUB aux0_Activities|char1
 
 byte[@MyStr][0]
 }
-  'vmc_tx.str(string("@12@Hello"))
-  'byte[@addr_txflag]~~
-  'vmc_tx.str(string("@12@activity"))
-  'byte[@addr_txflag][0]:=1
+  'BAD!!!
+  '---------------------
+  'The message header and first piece of  data is added to the tx buffer,
+  'including the <cr>, but buffer is not sent. Then, the rest of the data is added
+  'to the tx buffer. Finally, the entire tx buffer is sent
+  'NOTICE: If you look at the terminal screen then you will see that only the first
+  '   line of data is received correctly.This is because the data has a <cr> which tells
+  '   the router that it's the end of the current information....true?
+  '   Also...the @12@ header only applies to data up to a <cr> and so the second set of
+  '   data is not given the @12@ header which routes it to a different location since
+  '   we set a different default route
+  '   TODO maybe try to show this with stealth instead; not sure what I'm trying to show
+  vmc_tx.str(String("@12@Main Program Block...initial data...)",13))
+  vmc_tx.sendStr(String("...secondary data...",13))'I proved that this is never seen
+  waitcnt(clkfreq+cnt)
+
+  'Also notice that the address stripping only happens for the first 4 bytes of the string
+  'and after that @##@ is just part of the data, not a command
+
+  'How to show more data...
+  'waitcnt(clkfreq*2+cnt)'give the terminal long enough to not have problems displaying messages correctly
+  'vmc_tx.str(String("@12@Main Program Block...initial data...)",13))
+  'vmc_tx.send'force the string to be sent
+  'waitcnt(clkfreq*2+cnt)'still nothing
+  'and now the individual command to send what ever is in the buffer
+  'vmc_tx.sendStr(String("...secondary data...",13))'I proved that this is never seen
+
+  'Send a single string with <cr>
+
+  'Build a string, then send it from dev#14(vmc)
+  'Build a string, then send it from dev#14(vmc)
+  vmc_tx.str(String("@12@Inside Main Program Block..."))
+  vmc_tx.str(String("From dev#14 to dev#12..."))
+  vmc_tx.sendStr(String("i.e. from VMC to Term"))
+  waitcnt(clkfreq+cnt)
+
+  'Notice that there is no need to send the <cr>, it is taken care of by sendStr and send
+
+  'Build a string, then send it from dev#14(vmc)
+  vmc_tx.str(String("@12@Still Inside Main Program Block..."))
+  vmc_tx.str(String("From dev#"))
+  vmc_tx.dec(14)
+  vmc_tx.str(String(" to dev#"))
+  vmc_tx.dec(12)
+  vmc_tx.str(String("..."))
+  vmc_tx.str(String("...using some hex:"))
+  vmc_tx.hex($FF,2)
+  vmc_tx.send
+  waitcnt(clkfreq+cnt)
+  'GOOD
+  '---------------------
+
+  'Send bla bla
+  'vmc_tx.str(String("@12@Main Program Block)",13))
+  'vmc_tx.sendStr(String("Dev#14(VMC) to Dev#12(Term",13))
+  'sendStr("@12@To terminal(dev#12) from Virtual Microcontroller(dev#14)")
   'waitcnt(clkfreq*2+cnt)
 
-  vmc_tx.str(string("@12@Activity",13))
-  byte[addr_txflag]~~
-  waitcnt(clkfreq*2+cnt)
-
-PUB aux0_ReactToPacket'(PacketAddr,FromWhere)
+PUB ReactToPacket'(PacketAddr,FromWhere)
 {
-This is where your code should react to data that is received.
+  Descr : Use this block to respond to data that is received.
+
+          The data is stored in main memory starting at addr_rx.
+          To access the first byte of data use
+
+          tempVar:=byte[addr_rx]
+                        ^do NOT use the @ symbol since addr_rx already holds the address
+
+          In order to transmit data from this method, use sendDec, sendStr, or sendHex
+
+  Input : PacketAddr:
+          FromWhere:
+
+  Return: N/A
 }
-  vmc_tx.str(string("@12@React",13))
-  byte[addr_txflag]~~
-  'byte[@addr_txflag][0]:=1
+  'Just an example, delete if you wish...
+
+  'We are just going to print the entire rx buffer to the terminal
+
+
+  'str(String("@12@Inside of ReactToPacket",13))
+  'str(String("
+  'sendStr(String("@12@To terminal(dev#12) from Virtual Microcontroller(dev#14)",13))
 
 PUB addr_inputpins
   return @inputpins
