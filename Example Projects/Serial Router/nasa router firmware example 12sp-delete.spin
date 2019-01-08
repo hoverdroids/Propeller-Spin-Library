@@ -1,57 +1,8 @@
-{{
-OBEX LISTING:
-  http://obex.parallax.com/object/520
-
-  Assumptions -- @ is delimiter char, <cr> is end of packet char / begin buffering next packet char. Max packet length is 256 bytes if you want more there's room :)
-
-  Router checks the first 4 bytes of a packet: if they match the regexpr, it's an address, if not send the packet to the default destination for that port. regexpr is delimiter, digit, digit, delimiter. (So port 0 must be addressed as @00@, @0@ is invalid).
-
-  Ports 00 to 11 are device ports. Max baud rate is 57600. OK to have fewer than 11 port, frees up cogs & hardware pins.
-
-  Port 12 is the terminal port. Max baud rate is 230400.
-
-  Port 13 is the router itself and commands can be sent to it.
-
-  Port 14 is the remaining cogs on the Propeller chip and can be addressed as a separate device, if some hardware pins aren't used, this acts as an extra microcontroller that can be used to read ADCs, control motors and what not. 2 cogs are currently free (if using all serial ports).
-
-  Examples:
-
-  If device 4 sends Hello_There to device 0, it would do so like this:
-
-  @00@Hello_There<cr>
-
-  Device 0 would receive this:
-
-  @04@Hello_There@<cr>
-
-  If logging is set, the terminal would receive @04>00@<cr> (logging set to 1) or @04>00@Hello_There@<cr> (logging set to 2)
-
-  Adding 50 to the port address (so @50@ to @64@ ) sends out the packet "stealthily", that is, without the origin address prefix. So if any device sends@00@Boo!<cr>then device 0 would receiveBoo!<cr>
-
-  In addition, if a device sends out a packet without addressinformation, it will be delivered to that device's defaultdestination.
-
-  These two things + a bit of configuration from the terminal allow using devices that cannot be made aware of the addressing protocol at all (such as GPSs).
-
-  The router at the moment only executes two commands, as follows:
-
-  R:nReboot, N can be any number.
-
-  L:xSets logging level to terminal to 0, 1 or 2.
-
-  D:xx>yySets default destination for port xx to port yy. OK to use stealthing with yy (it will do nothing if used with xx). Thus the terminal can decide what talks to what in realtime.
-
-  There is ample room to make the microcontroller do other things if desired :) Interfacing given our components is done thru resistors since signal inversion can be defined in software. Baud rates are NOT limited to standard bauds (so a baudrate of say 24000 is fine).
-
-  This was done for the PhoneSat group at NASA-AMES if anyone cares, so it will into space in a few months :)
-
-  UPDATE: Uses improved serial objects from http://forums.parallax.com/showthread.php?129714-Tim-Moore-s-pcFullDuple...(512-byte)-rx-buffer
-
-}}
-
+''SOURCE: http://obex.parallax.com/object/520
 CON
                                                                                                                               
         _clkmode                = xtal1 + pll16x
-        _xinfreq                = 6_000_000'5_000_000
+        _xinfreq                = 5_000_000
         _stack                  = 100 ' mah? set this to MainStack instead?                                                                                       
 
 
@@ -66,7 +17,7 @@ terminal: "FullDuplexSerialExt"
 dummyplug: "serial_output_thingy"
 
 con
-numbuffers  = 1'12  'modify the number of ports you want here; this doesn't include the debug port
+numbuffers  = 12
 buffersize  = com#SECONDARY_BUFFER_SIZE
 delimchar   = "@" ' address delimiter
 termichar   = 13  ' packet delimiter
@@ -95,11 +46,11 @@ long aux0_stack[128]
 
 
 dat   'device num     0      1       2      3      4       5     6     7      8      9      10     11     term      device num
-inputpins      byte 24,     2,     5,     6,     9,     11,    13,    15,    17,    19,    21,    23,      31      ' Hardware input pin
-outputpins     byte 25,     3,     4,     7,     8,     10,    12,    14,    16,    18,    20,    22,      30      ' Hardware output pin
+inputpins      byte 0,     2,     5,     6,     9,     11,    13,    15,    17,    19,    21,    23,      31      ' Hardware input pin
+outputpins     byte 1,     3,     4,     7,     8,     10,    12,    14,    16,    18,    20,    22,      30      ' Hardware output pin
 inversions     byte %0000, %0000, %0000, %0000, %0000, %0011, %0011, %0011, %0011, %0011, %0011, %0011,   %0000   ' Signal flags (open collector, inversion etc.)
-baudrates      long 9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  115200  ' Baud rate
-defaultroute   byte 62,  term,  term,  term,  term,  term,  term,  term,  term,  term,  term,  term,    50  '0 was:term;term was:router If a packet coming from this port has no address, default to sending it to that port. Use stealthmask to strip packet information.
+baudrates      long  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  9600,  115200  ' Baud rate
+defaultroute   byte term,  term,  term,  term,  term,  term,  term,  term,  term,  term,  term,  term,    router  ' If a packet coming from this port has no address, default to sending it to that port. Use stealthmask to strip packet information.
 dat ' configuration options for the router
 defaultaddress byte term   ' where to send things we don't know what to do with
 bigbrother     byte  2     ' 0 none, 1 terminal monitors inter-device exchange, 2 terminal monitors that AND packet contents (useful to not have to send the same packet twice
@@ -122,14 +73,13 @@ if (debug)
 
 
 terminal.start(byte[@inputpins+12],byte[@outputpins+12],byte[@inversions+12],long[@baudrates+12*4])    ' high speed port gets special treatment (update: should it?)
-
 aux0_com.init(@aux0_buffer_tx,buffersize) ' virtual com port for aux0_ device
 
 
 port~    ' start all the other ports here 
 repeat numbuffers
   if (byte[@inputpins+port] < 32) and (byte[@outputpins+port] < 32)
-    com.AddPortNoHandshake(port,byte[@inputpins+port],byte[@outputpins+port],byte[@inversions+port],long[@baudrates+port*4])'CHRIS:this is where the ports are "added"
+    com.AddPortNoHandshake(port,byte[@inputpins+port],byte[@outputpins+port],byte[@inversions+port],long[@baudrates+port*4])
     port++
 com.start
 
@@ -335,47 +285,10 @@ pri CallAsyncCommand(CommandAddr,origin)
      aux0_lastorigin:=origin
      aux0_rxflag~~
     
-pri removetermchar(StringAddr) : i
-    i := StringAddr
-    repeat strsize(StringAddr)
-       if (byte[i] == termichar or byte[i] == termichar2)
-           byte[i] := 0 '32
-       i++
 
-pri reformat (ByteVal, destinationport) ' how about doing per-string instead of per-character? Probably faster...
 
-    if (doupcase and ByteVal > constant("a"-1) and ByteVal < constant("z"+1))
-         ByteVal-=$20
-    if (dolowcase and ByteVal > constant("A"-1) and ByteVal < constant("Z"+1))
-         ByteVal+=$20
 
-{
-    if (doupcase)
-       ByteVal := upcase(ByteVal)
-    elseif (dolowcase)
-       ByteVal := lowcase(ByteVal)
-}
-    return ByteVal
 
-pri upcase(ByteVal)
-'' go to uppercase, 1 character -- that's all it does (used in parsing)
-
-    if (ByteVal > constant("a"-1) and ByteVal < constant("z"+1))
-         return (ByteVal-$20)
-    return ByteVal
-{
-pri lowcase(ByteVal)
-'' go to uppercase, 1 character -- that's all it does (used in parsing)
-
-    if (ByteVal > constant("A"-1) and ByteVal < constant("Z"+1))
-         return (ByteVal+$20)
-    return ByteVal
-}
-pri BuildAddress(num,where) 
-    byte[where] := delimchar
-    byte[where+1] := "0"+num/10
-    byte[where+2] := "0"+num//10
-    byte[where+3] := delimchar
 pri isDigit(char)
     if (char > "9" or char < "0")
        return false
@@ -443,7 +356,7 @@ long aux0_cog
 long aux0_lastorigin
 pri aux0_loop ' auxiliary cog function. Should not need modifications.
     repeat
-     aux0_Activities  'the aux0_Activity will keep looping even though there are no received packets; the buffer is updated when a new message comes in
+     aux0_Activities
      if (aux0_rxflag) ' we got something in buffer
          aux0_rxflag~
          aux0_busyflag~~
@@ -451,23 +364,8 @@ pri aux0_loop ' auxiliary cog function. Should not need modifications.
          aux0_busyflag~
     cogstop(aux0_cog~ - 1)
 
-pub aux0_Activities|char1 ' auxilliary cog loop cycle (gets looped by aux0_loop). You can treat this as its own microcontroller basically.
-'if this PUB and the next are telling the truth, this may be where my code goes after not starting certain ports
-'since those pins are not for ports; should also mean that this virtual microcontroller should be able to react based on info
-'that it was sent; also, if each port can address the others, the XBee data should go right to the ASD and vice versa-if I can figure out how
-'since the Xbee will send the @addres yadayada as a string once the delimiter is sent (right?)
-dira[27]:=1
-  
-''repeat 'don't use without a condition else it blocks
-  'if aux0_buffer_rx[0]=="A" 'note that the aux0_buffer_rx does not get reset until a new message is received;also, the buffer does not include the address
-    'outa[27]:=1
-    'waitcnt(clkfreq+cnt)
-    'outa[27]:=0
-    'waitcnt(clkfreq+cnt)
-  ''aux0_com.str(string("@00@test")) 'was using for?
-  ''aux0_txflag~~                    'was using for?
-'use the following for a passthrough...nothing is required since that can be set by default
- 
+pub aux0_Activities ' auxilliary cog loop cycle (gets looped by aux0_loop). You can treat this as its own microcontroller basically.
+
 
 
 pub aux0_ReactToPacket'(PacketAddr,FromWhere) ' auxilliary cog function called when the virtual internal serial port got something. aux0_buffer_rx contains it and aux0_lastorigin says where it's from.

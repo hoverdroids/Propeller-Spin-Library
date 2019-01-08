@@ -1,6 +1,14 @@
-{
-  SOURCE: http://obex.parallax.com/object/413
+{{
+OBEX LISTING:
+  http://obex.parallax.com/object/413
 
+  Supports upto 4 serial ports with 1 COG. Also supports hardware flow control on any of the ports.
+
+  Fixed issue with 4th port. All 4 ports now tested and working.
+  Added additional test programs in download.
+  Added comment and version variable if need multiple copies of driver (i.e. more than 4 ports)
+}}
+{
   test for 4 port serial driver
   assumes P0 connected to P4, P1 to P5 and P2 to P6
 }

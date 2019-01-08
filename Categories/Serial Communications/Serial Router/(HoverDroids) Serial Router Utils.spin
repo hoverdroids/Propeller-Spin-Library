@@ -94,6 +94,20 @@ PUB reformat (ByteVal, destinationport, doupcase,dolowcase) ' how about doing pe
        ByteVal := lowcase(ByteVal)
 }
     return ByteVal
+pri reformat (ByteVal, destinationport) ' how about doing per-string instead of per-character? Probably faster...
+
+    if (doupcase and ByteVal > constant("a"-1) and ByteVal < constant("z"+1))
+         ByteVal-=$20
+    if (dolowcase and ByteVal > constant("A"-1) and ByteVal < constant("Z"+1))
+         ByteVal+=$20
+
+{
+    if (doupcase)
+       ByteVal := upcase(ByteVal)
+    elseif (dolowcase)
+       ByteVal := lowcase(ByteVal)
+}
+    return ByteVal
      '
 PUB upcase(ByteVal)
 '' go to uppercase, 1 character -- that's all it does (used in parsing)
@@ -101,7 +115,20 @@ PUB upcase(ByteVal)
     if (ByteVal > constant("a"-1) and ByteVal < constant("z"+1))
          return (ByteVal-$20)
     return ByteVal
+pri upcase(ByteVal)
+'' go to uppercase, 1 character -- that's all it does (used in parsing)
 
+    if (ByteVal > constant("a"-1) and ByteVal < constant("z"+1))
+         return (ByteVal-$20)
+    return ByteVal
+{
+pri lowcase(ByteVal)
+'' go to uppercase, 1 character -- that's all it does (used in parsing)
+
+    if (ByteVal > constant("A"-1) and ByteVal < constant("Z"+1))
+         return (ByteVal+$20)
+    return ByteVal
+}
 PUB lowcase(ByteVal)
 '' go to uppercase, 1 character -- that's all it does (used in parsing)
 
@@ -114,13 +141,23 @@ PUB BuildAddress(num,where,delimchar)
     byte[where+1] := "0"+num/10
     byte[where+2] := "0"+num//10
     byte[where+3] := delimchar
-
+pri BuildAddress(num,where)
+    byte[where] := delimchar
+    byte[where+1] := "0"+num/10
+    byte[where+2] := "0"+num//10
+    byte[where+3] := delimchar
 PUB isDigit(char)
     if (char > "9" or char < "0")
        return false
     return true
 
 PUB removetermchar(StringAddr, termichar, termichar2) : i
+    i := StringAddr
+    repeat strsize(StringAddr)
+       if (byte[i] == termichar or byte[i] == termichar2)
+           byte[i] := 0 '32
+       i++
+pri removetermchar(StringAddr) : i
     i := StringAddr
     repeat strsize(StringAddr)
        if (byte[i] == termichar or byte[i] == termichar2)
