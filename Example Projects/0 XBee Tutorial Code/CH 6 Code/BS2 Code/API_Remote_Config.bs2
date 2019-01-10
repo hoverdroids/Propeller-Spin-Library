@@ -1,0 +1,59 @@
+' ********************************************************
+' API_Remote_Config.bs2
+' Sends API frames for remote configuration of XBee
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15     ' XBee DOUT
+Tx              PIN     14     ' XBee DIN
+RTS             PIN     11     ' XBee /RTS
+
+' ************** Variable Declarations ******************
+Code    VAR Byte(2)
+Value   VAR Word
+Addr    VAR Word
+Checksum VAR Byte
+' ************** XBee Configuration *********************
+PAUSE 500
+DEBUG "Configuring XBee...",CR
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["+++"]              ' Command mode sequence
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["ATAP1,D61,CN",CR]  ' API enable, enable RTS
+                                    ' Exit Command Mode (CN)
+' ************** Main LOOP ******************************
+
+DO
+       DEBUG CR,"Hex Address of Remote? "        ' Enter address
+       DEBUGIN HEX Addr
+       DEBUG "2-letter Command? "                ' Enter config code
+       DEBUGIN Code(0)
+       DEBUGIN Code(1)
+       DEBUG CR,"Hex Value? "                    ' Enter value for config
+       DEBUGIN HEX Value
+       Checksum = $FF-$17-2-Addr-code(0)-code(1)-value ' Calc checksum
+       DEBUG "Sending:",CR
+       SEROUT Tx,Baud,[$7E,0,17,$17,                   ' start, length, ident
+                       0,REP 0\8,                      ' Frame ID 0, 0 64-bit
+                       Addr.HIGHBYTE, Addr.LOWBYTE,    ' address
+                       2,                              ' option - apply now
+                       code(0),code(1),                ' Config code
+                       Value.HIGHBYTE,value.LOWBYTE,   ' Value to send
+                       checksum]                       ' Checksum value
+LOOP

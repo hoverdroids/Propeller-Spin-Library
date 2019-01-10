@@ -1,0 +1,38 @@
+' ********************************************************
+' Simple_Decimal_Receive.bs2
+' Accepts, displays and echoes back incoming Decimal Value
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15    ' XBee DOUT
+Tx              PIN     14    ' XBee DIN
+RTS             PIN     11    ' XBee RTS - Not used yet
+
+' ************** Variable Declarations ******************
+DataIn          VAR     Word
+
+' ************** Main LOOP ******************************
+PAUSE 500                     ' 1/2 second pause to stabilize comms
+DEBUG "Awaiting Decimal Data...",CR
+
+DO
+  SERIN Rx, Baud, [DEC DataIn]     ' Accept incoming Decimal Value
+  SEROUT Tx, Baud, [DEC DataIn,CR] ' Echo decimal value back
+  DEBUG DEC DataIn,CR              ' Display value
+LOOP

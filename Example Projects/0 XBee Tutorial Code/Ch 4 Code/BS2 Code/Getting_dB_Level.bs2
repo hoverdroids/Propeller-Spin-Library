@@ -1,0 +1,82 @@
+' ********************************************************
+' Getting_dB_Level.bs2
+' Receive multiple decimal data and report dBm level
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15
+Tx              PIN     14
+RTS             PIN     11
+
+' ************** Variable Declarations ******************
+DataIn          VAR     Byte
+Val1            VAR     Word
+Val2            VAR     Word
+' ************** XBee Configuration *********************
+PAUSE 500
+DEBUG "Configuring XBee...",CR
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["+++"]              ' Command mode sequence
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["ATD6 1,GT3,CN",CR] ' RTS enable (D6 1)
+                                    ' Very low Guard Time (GT 3)
+                                    ' Exit Command Mode (CN)
+' ************** Main LOOP ******************************
+PAUSE 500
+DEBUG "Awaiting Delimiter and Multiple Decimal Data...",CR
+
+DO
+
+  SERIN Rx\RTS,Baud,5,TimeOut,[DataIn]  ' Briefly wait for delimiter
+
+  IF DataIn = "!" THEN                   ' If delimiter, get data
+    SERIN Rx\RTS,Baud,3000,TimeOut,[DEC Val1]  ' Accept first value
+    SERIN Rx\RTS,Baud,3000,TimeOut,[DEC Val2]  ' Accept next value
+                                         ' Display remotely and locally
+    SEROUT Tx, Baud, [CR,"Values = ", DEC Val1," ", DEC Val2,CR]
+    DEBUG CR,"Values = ", DEC Val1," ", DEC Val2,CR
+
+    GOSUB Get_dBm                        ' Retrieve RSSI level
+  ENDIF
+
+  GOTO Done                              ' Jump to done
+  Timeout:
+  DEBUG "."                              ' If no DATa, display dots
+  Done:
+LOOP
+
+' ************** Subroutines ***************************
+Get_dBm:
+  GOSUB Empty_Buffer             ' Ensure no data left in XBee
+  PAUSE 5                        ' Short guard time
+  SEROUT Tx,Baud,["+++"]         ' Command Mode
+  PAUSE 5                        ' Short guard time
+  SEROUT Tx,Baud,["ATDB,CN",CR]  ' Request dBm Level (ATDB)
+                                 ' Accept returning HEX data with timeout
+  SERIN Rx\RTS,Baud,20,TimeOut_dB,[HEX DataIn]
+  SEROUT Tx,Baud,[CR,"RSSI = -",DEC DataIn,CR]  ' Display remotely
+  DEBUG "RSSI = -",DEC DataIn,CR                ' Display locally
+  TimeOut_dB:
+RETURN
+
+Empty_Buffer:                         ' Loop until no more data
+  SERIN Rx\RTS,Baud,5,Empty,[DataIn]  ' Accept, when no data exit
+  GOTO Empty_Buffer                   ' Keep accepting until empty
+  Empty:
+RETURN

@@ -1,0 +1,113 @@
+' ******************************************************
+' Remote_Monitor_Control.bs2
+' This program will send light level to StampPlot for plotting
+' and request and use values for LED state, Buzzer tone and servo position.
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+'****************** Variable, Constants and Pins
+Baud            CON     T9600
+
+LED             PIN     0
+Buzzer          PIN     8
+PhotoT          PIN     5
+Servo           PIN     12
+
+Rx              PIN     15   ' XBee DOUT
+Tx              PIN     14   ' XBee DIN
+RTS             PIN     11   ' XBee RTS
+
+Freq            VAR     Word ' Received frequency for buzzer
+State           VAR     Bit  ' Received state of LED
+x               VAR     Byte ' General byte data
+Light           VAR     Word ' Measured light level
+Position        VAR     Word ' Received servo position
+
+My_Addr         CON     $0   ' Set address of node, Need to set base to this
+                             ' address if not 0
+' ***************** Configure XBee to use RTS and set Address
+Position = 750
+
+PAUSE 3000                      ' Guard time
+SEROUT Tx,Baud,["+++"]          ' Command Mode Sequence
+PAUSE 2000                      ' Guard time
+SEROUT Tx,Baud,["ATD6 1",CR]    ' Enable RTS
+SEROUT Tx,Baud,["ATMY ", HEX My_Addr,CR]  ' Set node address
+SEROUT Tx,Baud,["ATDL 0,CN",CR] ' Set destination address of base
+                                ' & Exit Command Mode
+' ***************** Main Loop
+DO
+  GOSUB StampPlot_Update
+  GOSUB StampPlot_Read
+  GOSUB Control
+LOOP
+
+StampPlot_Update:
+      HIGH PhotoT                             ' Use RCTime to get value
+      PAUSE 5
+      RCTIME PhotoT,1,Light
+        ' Send value to be plotted on plot channel
+        ' !ACHN Channel (0-9), value, color (0-15 or color name)
+      SEROUT Tx,Baud,["!ACHN 0,",DEC Light,",(BLACK)",CR]
+        ' Update meter
+        ' !O Meter1 = value
+      SEROUT TX,Baud,["!O Meter1","=",DEC Light,CR]
+RETURN
+
+StampPlot_Read:
+      GOSUB EmptyBuffer                       ' ensure buffer empty
+        ' request switch value for LED state
+        ' !READ (swLED) for LED data
+      SEROUT TX,Baud,["!READ (swLED)",CR]
+        ' Accept returned data
+      SERIN Rx\RTS,Baud,100,Timeout,[DEC State]
+        ' Request slider for buzzer
+        ' !READ (sldTone) for buzzer frequency
+      SEROUT TX,Baud,["!READ (sldTone)",CR]
+        ' Accept returned value (0 to 5000)
+      SERIN Rx\RTS,Baud,100,Timeout,[DEC Freq]
+        ' !READ (sldServo) to control servo position
+      SEROUT TX,Baud,["!READ (sldServo)",CR]
+        ' Accept returned value (500 to 1000)
+      SERIN Rx\RTS,Baud,100,Timeout,[DEC Position]
+Timeout:
+RETURN
+
+Control:
+  IF State = 1 THEN                          ' Control LED based on state
+    HIGH LED
+  ELSE
+    LOW LED
+  ENDIF
+
+  IF Freq <> 0 THEN                          ' Control Buzzer based on Freq
+    FREQOUT Buzzer,50,Freq
+  ELSE
+    PAUSE 100
+  ENDIF
+
+  FOR x = 1 TO 20                            ' Control Servo based on Position
+    PULSOUT Servo, Position
+    PAUSE 20
+  NEXT
+RETURN
+
+EmptyBuffer:
+      SERIN Rx\RTS,84,10,Done,[x]            ' Ensure buffer empty
+      GOTO EmptyBuffer
+Done:
+RETURN

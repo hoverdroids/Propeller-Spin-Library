@@ -1,0 +1,127 @@
+' ******************************************************
+' Manual_Polling_Base.bs2
+' This program:
+'   - Configures XBee for fast AT Command Mode
+'   - Using DEBUG Window, User can control remote
+'     L-LED, B-Buzzer, S-Servo or R-Read remote sensor
+'   - Sets address and data to selected node address
+'   - Accepts an acknowledgement value
+'   - Requires 802.15.4 XBee (Series 1)
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+' ***************** Variables, Constants and Pins
+Baud            CON     T9600  ' Set Baud rate
+
+Rx              PIN     15     ' XBee DOUT
+Tx              PIN     14     ' XBee DIN
+
+DataOut         VAR     Word   ' Frequency to send
+DL_Addr         VAR     Word   ' Destination address for data
+DataIn          VAR     Byte   ' General variable for data
+Light           VAR     Word   ' Returned light level
+
+' ***************** Configure XBee in AT Command Mode
+PAUSE 500
+DEBUG CLS,"Configuring XBee..."
+
+PAUSE 3000                        ' Guard time
+SEROUT Tx,Baud,["+++"]            ' Command Mode Sequence
+PAUSE 2000                        ' Guard time
+SEROUT Tx,Baud,["ATGT 3,MY 0",CR] ' Set low guard time and base address
+SEROUT TX,Baud,["ATCN",CR]        ' Exit Command Mode
+
+' ***************** Main Loop
+DO
+  ' Request address and action in DEBUG Window
+  DEBUG CLS,"Enter Node Address in Hex (1-FFFF):"
+  DEBUGIN HEX DL_Addr                   ' Accept address in Hex
+  GOSUB Config_XBee                     ' Set DL address of XBee
+
+  DEBUG CR,"Choose Action:",CR,
+        "S - Set Servo Position",CR,
+        "L - Set LED State",CR,
+        "B - Set Buzzer Frequency",CR,
+        "R - Read Light Level",CR,
+        "? "
+  DEBUGIN DataIn                        ' Accept choice
+
+  ' If Servo Control, get value and send
+  SELECT DataIn
+   CASE "S","s"
+    DEBUG CR,"Enter Servo Position (500-1000):"
+    DEBUGIN DEC DataOut                    ' Accept user data
+    DEBUG "Sending Data!",CR
+    SEROUT Tx,Baud,["S",CR,CR]             ' Send S
+    SEROUT Tx,Baud,[DEC DataOut,CR,CR]     ' Send Data
+    GOSUB CheckAck                         ' Get acknowledgement
+    GOTO Done
+
+  ' LED control, get state and send
+   CASE "L","l"
+    DEBUG CR,"Enter LED State (0/1):"
+    DEBUGIN DEC DataOut                    ' Accept user data
+    DEBUG "Sending Data!",CR
+    SEROUT Tx,Baud,["L",CR,CR]             ' Send L
+    SEROUT Tx,Baud,[DEC DataOut,CR,CR]     ' Send LED state
+    GOSUB CheckAck                         ' Get Acknowledgement
+    GOTO Done
+
+  ' Buzzer control, get value and send
+   CASE "B","b"
+    DEBUG CR,"Enter Buzzer Frequency:"
+    DEBUGIN DEC DataOut                    ' Accept user data
+    DEBUG "Sending Data!",CR
+    SEROUT Tx,Baud,["B",CR,CR]             ' Send B
+    SEROUT Tx,Baud,[DEC DataOut,CR,CR]     ' Send Buzzer Frequency
+    GOSUB CheckAck                         ' Get Acknowledgement
+    GOTO Done
+
+  ' Get reading from remote sensor
+   CASE "R","r"
+    DEBUG CR,"Requesting reading...",CR
+    SEROUT Tx,Baud,["R",CR,CR]               ' Send R
+    SERIN  Rx,Baud,1000, Timeout,[DEC Light] ' Accept returning data
+    DEBUG "Light level = ", DEC light,CR     ' Display
+    GOTO Done
+  ENDSELECT
+Timeout:
+  DEBUG "No data received",CR
+Done:
+  PAUSE 2000
+LOOP
+
+Config_XBee:
+  ' Configure XBee for destination node address
+  PAUSE 10                                  ' Short guard time
+  SEROUT Tx,Baud,["+++"]                    ' Command Mode sequence
+  PAUSE 10                                  ' Short guard time
+  SEROUT TX,Baud,["ATDL ", HEX DL_Addr,CR]  ' Set Destination Node Address
+  SEROUT Tx,Baud,["ATCN",CR]                ' Exit Command Mode
+RETURN
+
+CheckAck:
+  SERIN Rx,Baud,1000,CheckTimeout,[DEC dataIn] ' Accept incoming byte
+  IF dataIn = 1 THEN                           ' If 1, then ack'd
+    DEBUG BELL,"OK - Ack Received!",CR
+  ELSE                                         ' If received, but not "1", problem
+    DEBUG "Bad Ack!",CR
+  ENDIF
+  RETURN
+CheckTimeout:
+  DEBUG "No ack received!",CR                  ' If nothing recieved
+RETURN

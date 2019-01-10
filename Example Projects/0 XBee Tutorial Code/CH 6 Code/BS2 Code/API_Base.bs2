@@ -1,0 +1,229 @@
+' ********************************************************
+' API_Base.bs2
+' Sets XBee in API Mode, sends values, remote command codes,
+' accepts values, transmit responses and ADC/DIO data
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15     ' XBee DOUT
+Tx              PIN     14     ' XBee DIN
+RTS             PIN     11     ' XBee /RTS
+
+' ************** Variable Declarations ******************
+DataSet         VAR     Byte (18)   ' Hold frame data
+idx             VAR     Byte        ' Index to data
+Value           VAR     Word        ' Received values
+FrameID         VAR     Nib         ' Frame ID
+Ch              VAR     Nib         ' Data Channel for ADC/DIO
+' ************** XBee Configuration *********************
+PAUSE 500
+DEBUG "Configuring XBee...",CR
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["+++"]              ' Command mode sequence
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["ATAP1,D61,CN",CR]  ' API enable, enable RTS
+                                    ' Exit Command Mode (CN)
+' ************** Main LOOP ******************************
+FrameID = 1
+DO
+  DEBUG CR,CR,"Choose:",CR,         ' Menu options
+        "1) Send Value",CR,
+        "2) Remote Config",CR,
+        "3) Set Frame ID",CR,
+        "0) Check for Data",CR
+  GOSUB ClearBuffer                 ' Clear XBee buffer & DataSet
+  DEBUGIN DataSet(0)                ' Accept choice
+
+  SELECT DataSet(0)
+    CASE "1"                        ' Send value to address
+       DataSet(0) = $7E             ' Start Delimter
+       DataSet(1) = 0               ' Length MSB
+       DataSet(2) = 11              ' Length LSB
+       DataSet(3) = $01             ' API Ident
+       DataSet(4) = FrameID         ' FrameID
+       DEBUG CR,"Hex Addr? "        ' Enter address
+       DEBUGIN HEX Value
+       DataSet(5) = Value.HIGHBYTE  ' Parse address into frame
+       DataSet(6) = Value.LOWBYTE
+       DataSet(7) = 0               ' Options - request Ack
+       DEBUG CR,"Value? ",CR        ' Enter value to send
+       DEBUGIN DEC Value
+       FOR Idx = 0 TO 4             ' Save value in frame as ASCII
+         DataSet(8+Idx) = Value DIG (4-Idx) + $30
+       NEXT
+       DataSet(13) = CR             ' End with CR
+       DataSet(14) = $FF            ' Checksum start value
+       FOR idx = 3 TO 13            ' Calculate checksum
+         DataSet(14) = DataSet(14) - DataSet(idx)
+       NEXT
+       DEBUG CR
+       DEBUG "Sending:",CR
+       FOR idx = 0 TO 14            ' Show data frame
+         DEBUG HEX2 DataSet(Idx), " "
+       NEXT
+       FOR idx = 0 TO 14            ' Send data frame
+         SEROUT Tx,Baud,[DataSet(Idx)]
+       NEXT
+       GOSUB GetFrame               ' accept returning frame
+
+    CASE "2"                        ' Send remote config
+       DataSet(0) = $7E             ' Start Delimter
+       DataSet(1) = 0               ' Length MSB
+       DataSet(2) = 17              ' Length LSB
+       DataSet(3) = $17             ' API Ident
+       DataSet(4) = FrameID         ' FrameID
+       DEBUG CR,"Hex Addr? "        ' Enter address
+       DEBUGIN HEX Value
+       DataSet(5) = Value.HIGHBYTE  ' Parse address into frame
+       DataSet(6) = Value.LOWBYTE
+       DataSet(7) = 2               ' Options - Apply now
+       DEBUG "2-letter Command? "   ' Enter config code
+       DEBUGIN DataSet(8)
+       DEBUGIN DataSet(9)
+       DEBUG CR,"Hex Value? "       ' Enter value for config
+       DEBUGIN HEX Value
+       DataSet(10) = Value.HIGHBYTE ' Parse value into frame
+       DataSet(11) = Value.LOWBYTE
+       DataSet(12) = $FF            ' Checksum start value
+       FOR idx = 3 TO 11            ' Calc checksum
+         DataSet(12) = DataSet(12) - DataSet(idx)
+       NEXT
+       DEBUG "Sending:",CR
+       FOR idx = 0 TO 4             ' show frame
+         DEBUG HEX2 DataSet(Idx), " "
+       NEXT
+       DEBUG "00 00 00 00 00 00 00 00 " ' 64-bit address (unused)
+       FOR idx = 5 TO 12
+         DEBUG HEX2 DataSet(Idx), " "
+       NEXT
+       FOR idx = 0 TO 4             ' send frame
+         SEROUT Tx,Baud,[DataSet(Idx)]
+       NEXT
+       SEROUT tx,Baud,[REP 0\8]     ' 64-bit addr
+       FOR idx = 5 TO 12            ' Rest of frame
+         SEROUT Tx,Baud,[DataSet(Idx)]
+       NEXT
+       GOSUB GetFrame
+
+    CASE "3"                        ' Set frame ID - 0=no ack
+       DEBUG CR,"ID ? "             ' Get ID
+       DEBUGIN DEC FrameID
+    CASE "0"                        ' Wait for incoming data
+       GOSUB GetFrameLoop
+  ENDSELECT
+LOOP
+
+GetFrameLoop:                       ' Keep checking for frame
+   DEBUG CR,"Waiting - Any key to stop"
+Rep_Loop:
+   GOSUB GetFrame
+   SERIN 16,Baud,100,TimeStop,[value] ' until user presses key
+   RETURN
+TimeStop:
+GOTO REP_Loop
+
+GetFrame:
+  GOSUB ClearDataSet                ' Clear frame
+                                    ' accept frame data with RTS
+  SERIN Rx\RTS,Baud,50,Timeout,[STR DataSet\18]
+  Timeout:
+  IF DataSet(0) = $7E THEN          ' Check for start delimiter
+    DEBUG CR,CR,"RX Frame! ",REP "*"\40,CR
+    FOR IDX = 0 TO 17               ' Show frame
+      DEBUG HEX2 DataSet(IDX), " "
+    NEXT
+    GOSUB ParseData                 ' Break down frame
+  ENDIF
+RETURN
+
+ParseData:
+   DEBUG CR,                        ' Display length & API Ident
+         "Len:",DEC DataSet(1)<<8 + DataSet(2),CR,
+         "Ident: ",IHEX2 DataSet(3)
+   SELECT DataSet(3)
+     CASE $81                       ' Received data frame
+       DEBUG "  Rx Data",CR,
+             " Addr: ",IHEX4 DataSet(4)<<8 + DataSet(5),CR,
+             " RSSI: -",DEC DataSet(6),CR,
+             " Opt:  ",IHEX DataSet(7),CR,
+             " Data: "
+       Value = 0                   ' show value & convert to decimal
+       FOR IDX = 8 TO (8 + DataSet(2)-6)
+         DEBUG DataSet(IDX)
+         IF (DataSet(Idx) > $29) AND (DataSet(Idx) < $40) THEN
+           Value = Value * 10 + (DataSet(Idx)- $30)
+         ENDIF
+       NEXT
+       DEBUG " Value:", DEC Value,CR ' Display data
+
+     CASE $83                     ' ADC/DIO data
+       DEBUG "  Rx ADC/DIO",CR,
+             " Addr: ",IHEX4 DataSet(4)<<8 + DataSet(5),CR,
+             " RSSI: -",DEC DataSet(6),CR,
+             " Opt:  ",IHEX DataSet(7),CR,
+             " Data: ",CR
+       Ch = 0
+       FOR Idx = 1 TO 6           ' Check header for valid ADC channels
+        IF DataSet(9) & (1<<Idx) > 0 THEN
+           Value = DataSet(13+(Ch*2)) << 8 + DataSet(14+(Ch*2))
+           DEBUG "  ADC Ch", DEC Idx-1,"=",DEC Value,CR
+           Ch = Ch+1
+        ENDIF
+       NEXT
+       FOR Idx = 0 TO 7           ' Check header for valid digital data
+        IF DataSet(10) & (1<<Idx) > 0 THEN
+           Value = DataSet(12) & (1<<Idx) >> Idx
+           DEBUG "  DIO Ch", DEC Idx,"=",DEC Value,CR
+        ENDIF
+        NEXT
+
+   CASE $89                       ' Transmit status frame
+       DEBUG "  Tx Status",CR,
+             " Opt:  ",DEC DataSet(5)
+       IF DataSet(5) = 0 THEN DEBUG " OK!"
+       IF DataSet(5) = 1 THEN DEBUG " No Ack"
+       IF DataSet(5) = 2 THEN DEBUG " CCA Fail"
+       IF DataSet(5) = 3 THEN DEBUG " Purged"
+       DEBUG CR
+
+  CASE $97                        ' Remote config status frame
+       DEBUG "  Config Check",CR,
+             " Opt:  ",DEC DataSet(17)
+       IF DataSet(17) = 0 THEN DEBUG " OK!"
+       IF DataSet(17) = 1 THEN DEBUG " Error"
+       IF DataSet(17) = 2 THEN DEBUG " Invalid Cmd"
+       IF DataSet(17) = 3 THEN DEBUG " Invalid Val"
+       IF DataSet(17) = 4 THEN DEBUG " No Resp"
+       DEBUG CR
+   ENDSELECT
+RETURN
+
+ClearDataSet:                     ' Clear data set
+  FOR Idx = 0 TO 17
+    DATASet(Idx) = 0
+  NEXT
+RETURN
+
+ClearBuffer:                      ' Empty XBee buffer
+   SERIN Rx\RTS,Baud,50,TimeClear,[STR DataSet\18]
+TimeClear:
+   GOSUB ClearDataSet
+RETURN
+
+

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    >
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    >
+<EditText android:text="0" android:id="@+id/EditText03" android:layout_height="wrap_content" android:isScrollContainer="false" android:lines="1" android:layout_width="wrap_content"></EditText>
+<TextView android:layout_width="wrap_content" android:text="-- char delay | baudrate --" android:layout_height="wrap_content"/>
+<EditText android:text="9600" android:id="@+id/EditText02" android:layout_width="fill_parent" android:layout_height="wrap_content" android:isScrollContainer="false" android:lines="1"></EditText>
+</LinearLayout>
+<Button android:id="@+id/Button01" android:layout_height="wrap_content" android:layout_width="fill_parent" android:text="Output this to serial! (Menu to exit)"></Button>
+<EditText android:text="@+id/EditText01" android:id="@+id/EditText01" android:layout_width="fill_parent" android:layout_height="fill_parent" android:isScrollContainer="true" android:scrollbars="vertical"></EditText>
+
+</LinearLayout>

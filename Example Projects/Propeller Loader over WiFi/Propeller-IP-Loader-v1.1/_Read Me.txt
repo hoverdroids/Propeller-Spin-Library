@@ -1,0 +1,16 @@
+This is the archive of the IP Loader project built to develop and test downloading to the Propeller via Wi-Fi, using an XBee Wi-Fi S6B module.
+
+This is a Delphi XE6 project compiled to run on Windows 32-bit or 64-bit.
+
+   IP_Loader - contains the Windows IP project source.  The Main.pas and XBeeWiFi.pas units are the most important for study. 
+     |
+     |-- Win32\Release - contains the Windows executable, IP.exe
+     |
+     |-- Loader - contains the IP_Loader.spin source code and binary image for the micro boot loader used by the start of the downloading process
+
+   PropellerImages - contains the Spin and Binary example Propeller Applications used during testing of the download process.
+
+   PropellerStream - contains a related project meant to extract the micro boot loader components from the compiled binary image and provide
+                     a Delphi array-based representation of those components for pasting into the IP_Loader project's GenerateLoaderPacket
+                     method.
+

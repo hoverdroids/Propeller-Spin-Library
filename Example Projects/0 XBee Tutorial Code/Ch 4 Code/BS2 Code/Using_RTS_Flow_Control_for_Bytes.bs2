@@ -1,0 +1,51 @@
+' ********************************************************
+' Using_RTS_Flow_Control_for_Bytes.bs2
+' Configures XBee to Use RTS flow control to
+' prevent missed DATA
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15     ' XBee DOUT
+Tx              PIN     14     ' XBee DIN
+RTS             PIN     11     ' XBee /RTS
+
+' ************** Variable Declarations ******************
+DataIn          VAR     Word
+
+' ************** XBee Configuration *********************
+PAUSE 500
+DEBUG "Configuring XBee...",CR
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["+++"]              ' Command mode sequence
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["ATD6 1,CN",CR]     ' RTS enable (D6 1)
+                                    ' Exit Command Mode (CN)
+' ************** Main LOOP ******************************
+PAUSE 500
+DEBUG "Awaiting Multiple Byte Data...",CR
+
+DO
+  SERIN Rx\RTS,Baud,1000,TimeOut,[DataIn]  ' Use Timeout to wait for byte
+  SEROUT Tx, Baud, [DataIn]                ' Send back to PC
+  DEBUG DataIn                             ' Display data
+  GOTO Done                                ' Jump to done
+  Timeout:                                 ' If no data, display
+  DEBUG "."
+  Done:
+LOOP

@@ -1,0 +1,64 @@
+
+
+INIT:
+
+'Set as default macro
+!DEFS (ME)
+!MACR .OBJECTS
+' Set analog span
+!SPAN  0, 2000
+' Set max time
+!TMAX 120
+' Shift left at max
+!SHFT ON
+' Title plot
+!TITL Base Interface
+' Flush old data
+!FLSH ON
+' Set display information
+!DISP D9 G2 A0 S0 B15 R
+!PLOT ON
+
+
+ENDMAC
+
+OBJECTS:
+
+!POBJ Clear
+!PPER 70,100
+
+' Set Back Color ******** 
+!POBJ oBack=misc\background.jpg
+'   Meter1 -- OMETER *****
+!POBJ oMeter.Meter1=76.,96.,20.,23.,0,2000,0,2000
+
+'   lblMeter1 -- OLABEL *****
+!POBJ oLabel.lblMeter1=81.,72.,10.,5.,Light Level,,0,8,0
+!POBJ lblMeter1.F=Arial,8,1,0,0
+
+'   swLED -- OIMGBUT *****
+!POBJ oImgBut.swLED=84.,64.,5.,10.,comp\switch_0.jpg,1,comp\switch_1.jpg,0
+
+'   lblSwitch1 -- OLABEL *****
+!POBJ oLabel.lblSwitch1=81.6,53.,10.,3.,LED Control,,0,8,0
+!POBJ lblSwitch1.F=Arial,8,1,0,0
+
+'   sldTone -- OHSLIDER *****
+!POBJ oHSlider.sldTone=78.,44.,18.,5.,0,5000,2574
+
+'   sldServo -- OHSLIDER *****
+!POBJ oHSlider.sldServo=78.,27.,18.,5.,500,1000,750
+
+'   lblSlider1 -- OLABEL *****
+!POBJ oLabel.lblSlider1=82.,36.,10.,3.,Buzzer Tone Control,,0,8,0
+!POBJ lblSlider1.F=Arial,8,1,0,0
+
+'   lblSlider2 -- OLABEL *****
+!POBJ oLabel.lblSlider2=82.,19.,10.,3.,Servo Position,,0,8,0
+!POBJ lblSlider2.F=Arial,8,1,0,0
+
+
+ENDMAC
+
+
+

@@ -1,0 +1,117 @@
+' ******************************************************
+' Scheduled_Remote.BS2
+' Sends periodic current values to base
+' Accepts returning changes to configuration
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+'****************** Variable, Constants and Pins
+Baud            CON     T9600
+
+LED             PIN     0
+Buzzer          PIN     8
+PhotoT          PIN     5
+Servo           PIN     12
+
+Rx              PIN     15   ' XBee DOUT
+Tx              PIN     14   ' XBee DIN
+RTS             PIN     11   ' XBee RTS
+
+Freq            VAR     Word ' Received frequency for buzzer
+State           VAR     Bit  ' Received state of LED
+DataIn          VAR     Byte ' General byte data
+Light           VAR     Word ' Measured light level
+Position        VAR     Word ' Received servo position
+
+My_Addr         CON     $2   ' Set address of node, $1-$FFFE
+
+' ***************** Configure XBee to use RTS and set Address
+Position = 750
+PAUSE 500
+DEBUG CLS,"Configuring XBee...",CR
+PAUSE 3000                          ' Guard time
+SEROUT Tx,Baud,["+++"]              ' Command Mode Sequence
+PAUSE 2000                          ' Guard time
+SEROUT Tx,Baud,["ATMY ", HEX My_Addr,CR]  ' Set node address
+SEROUT Tx,Baud,["ATDL 0,D6 1",CR]   ' Set destination address and RTS
+SEROUT TX,Baud,["ATCN",CR]          ' Exit Command Mode
+
+' ***************** Main Loop
+
+PAUSE 1000
+DO
+  GOSUB FlushBuffer                 ' Ensure XBee buffer empty
+  GOSUB SendUpdate                  ' Send current values
+  GOSUB AcceptData                  ' Receive returned data
+  GOSUB Control                     ' Control Devices
+  PAUSE 3000                        ' Three seconds before sending again
+LOOP
+
+FlushBuffer:                        ' Empty XBee buffer
+  SERIN Rx\RTS,Baud,50,FlushTime,[DataIn] ' Get data
+  GOTO FlushBuffer                        ' If data, get more data
+FlushTime:                                ' If timed out, done
+RETURN
+
+SendUpdate:
+  GOSUB ReadLight                         ' Read light level
+  DEBUG CR,"Sending Updates",CR
+  SEROUT Tx,Baud,["C",CR,CR,              ' Send C and values
+                  HEX My_Addr,CR,CR,      ' Node's address
+                  DEC Light,CR,CR,        ' Light level
+                  DEC State,CR,CR,        ' LED state
+                  DEC Freq,CR,CR,         ' Frequency
+                  DEC Position,CR]        ' Servo position
+RETURN
+
+ReadLight:
+  HIGH PhotoT                             ' Read light sensor
+  PAUSE 5
+  RCTIME PhotoT,1,Light
+RETURN
+
+AcceptData:
+  SERIN Rx\RTS,Baud,1000,UpdateTout,[DataIn]        ' Accept byte
+  IF DataIn = "U"  THEN                             ' If "U", then accept
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC State]   ' LED State
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC Freq]    ' Buzzer freq
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC Position]' Servo Position
+    DEBUG "Updates:",CR                             ' Display
+    DEBUG "LED State:     ", DEC State,CR
+    DEBUG "Frequency:     ", DEC Freq,CR
+    DEBUG "Position:      ", DEC Position,CR
+  ENDIF
+  GOTO AcceptData                                   ' Ensure not more data
+UpdateTout:
+RETURN
+
+Control:                             ' Set LED based on state
+  IF State = 1 THEN
+    HIGH LED
+  ELSE
+    LOW LED
+  ENDIF
+
+  IF freq <> 0 THEN                  ' Set buzzer based on Freq
+    FREQOUT Buzzer,500,Freq
+  ENDIF
+
+  FOR DataIn = 1 TO 50               ' Position Servo
+    PULSOUT Servo, Position
+    PAUSE 20
+  NEXT
+RETURN

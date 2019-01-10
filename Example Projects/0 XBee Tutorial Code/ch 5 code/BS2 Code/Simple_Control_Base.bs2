@@ -1,0 +1,36 @@
+' ***********************************************
+' Simple_Control_Base.bs2
+' Sends changing frequency when button pressed
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+' ***************** Variables, Constants and Pins
+Baud            CON     T9600   ' Set baud rate
+Rx              PIN     15      ' XBee DOUT
+Tx              PIN     14      ' XBee DIN
+PB              PIN     0       ' Pushbutton
+Freq            VAR     Word
+
+' ***************** Main Loop
+DO
+ IF PB = 1 THEN                     ' If button pressed...
+   Freq = Freq + 500                ' Increment Frequency
+   IF Freq > 5000 THEN Freq = 500   ' Limit to 500 to 5000
+   SEROUT Tx, Baud,[DEC Freq,CR]    ' Send Frequency as decimal
+   PAUSE 500                        ' Short delay
+ ENDIF
+LOOP

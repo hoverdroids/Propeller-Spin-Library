@@ -1,0 +1,35 @@
+#!/bin/sh
+
+rm build/*
+
+bstc -DTICKS_16 -DBANDS_21 -DHT1632 -O ax -b  -o build/JB_DP11111  Analyzer.spin
+bstc -DTICKS_16 -DBANDS_21 -DHT1632 -O ax -e  -o build/JB_DP11111  Analyzer.spin
+bstc -DTICKS_16 -DBANDS_31 -DHT1632_C -O ax -b  -o build/JB_DP14112  Analyzer.spin
+bstc -DTICKS_16 -DBANDS_31 -DHT1632_C -O ax -e  -o build/JB_DP14112  Analyzer.spin
+	
+for COLS in 11 16 21 31 ; do
+	bstc -DTICKS_30 -DBANDS_"$COLS" -DPWM -O ax -b  -o build/JB_PWM_"$COLS"  Analyzer.spin || exit
+	bstc -DTICKS_30 -DBANDS_"$COLS" -DPWM -O ax -e  -o build/JB_PWM_"$COLS"  Analyzer.spin || exit
+done
+
+for ROWS in 20 30 ; do
+	for COLS in 21 31 ; do
+		bstc -DTICKS_"$ROWS" -DBANDS_"$COLS" -DVGA -O ax -b  -o build/JB_VGA_"$COLS"_"$ROWS"  Analyzer.spin || exit
+		bstc -DTICKS_"$ROWS" -DBANDS_"$COLS" -DVGA -O ax -e  -o build/JB_VGA_"$COLS"_"$ROWS"  Analyzer.spin || exit
+	done
+done
+
+for ROWS in 8 10 12 16 20 24 30 ; do
+	for COLS in 11 16 21 31 ; do
+		bstc -DTICKS_"$ROWS" -DBANDS_"$COLS" -DREGISTERS -O ax -b  -o build/JB_"$COLS"_"$ROWS"  Analyzer.spin || exit
+		bstc -DTICKS_"$ROWS" -DBANDS_"$COLS" -DREGISTERS -O ax -e  -o build/JB_"$COLS"_"$ROWS"  Analyzer.spin || exit
+	done
+done
+
+for ROWS in 8 10 12 16 20 24 30 ; do
+	for COLS in 11 16 21 31 ; do
+		bstc -DTICKS_"$ROWS" -DBANDS_"$COLS" -DREGISTERS2 -O ax -b  -o build/JB_RG_"$COLS"_"$ROWS"  Analyzer.spin || exit
+		bstc -DTICKS_"$ROWS" -DBANDS_"$COLS" -DREGISTERS2 -O ax -e  -o build/JB_RG_"$COLS"_"$ROWS"  Analyzer.spin || exit
+	done
+done
+

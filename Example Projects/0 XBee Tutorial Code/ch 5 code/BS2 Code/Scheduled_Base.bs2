@@ -1,0 +1,103 @@
+ ' ******************************************************
+' Scheduled_Base.bs2
+' This program:
+'   - Waits for an update from remote
+'   - Accepts and displays data for LED, Servo, Buzzer
+'     source address sent by remote
+'   - Based on received data, sends back changes to
+'     settings
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+' ***************** Variables, Constants and Pins
+Baud            CON     T9600  ' Set Baud rate
+
+Rx              CON     15     ' XBee DOUT
+Tx              CON     14     ' XBee DIN
+RTS             CON     11     ' XBee RTS
+
+State           VAR     Bit    ' LED State
+Freq            VAR     Word   ' Buzzer Frequency
+Position        VAR     Word   ' Servo Position
+Light           VAR     Word   ' Light level
+DL_Addr         VAR     Word   ' Destination address for data
+DataIn          VAR     Byte   ' General variable for data
+
+
+' ***************** Configure XBee in AT Command Mode
+PAUSE 500
+DEBUG CLS,"Configuring XBee...",CR
+
+PAUSE 3000                      ' Guard time
+SEROUT Tx,Baud,["+++"]          ' Command Mode Sequence
+PAUSE 2000                      ' Guard time
+SEROUT Tx,Baud,["ATGT 3,MY 0,D6 1",CR]    ' Set low guard time
+SEROUT TX,Baud,["ATCN",CR]      ' Exit Command Mode
+
+DEBUG "Awaiting Data..."
+' ***************** Main Loop
+DO
+  SERIN Rx\RTS,Baud,20,UpdateTOut,[DataIn]  ' Wait for "C" with timout
+  IF DataIn = "C"  THEN                     ' If "C" (Current), collect
+    DEBUG CR,"Incoming Data",CR
+    ' Accept incoming values with timeout
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[HEX DL_Addr]
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC Light]
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC State]
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC Freq]
+    SERIN Rx\RTS,Baud,1000,UpdateTOut,[DEC Position]
+
+    DEBUG CLS, "                    Unit ", IHEX DL_Addr," Reports",CR,
+          "Light Reading: ", DEC Light,CR,          ' Display data
+          "LED State:     ", DEC State,CR,
+          "Frequency:     ", DEC Freq,CR,
+          "Position:      ", DEC Position,CR
+
+    GOSUB Config_XBee                    ' Configure XBee for DL address
+    GOSUB ChangeRemote                   ' Change device values
+    SEROUT Tx,Baud,["U",CR,CR,           ' Send Update start character
+                  DEC State,CR,CR,       ' Send new LED state
+                  DEC Freq,CR,CR,        ' Send new frequency
+                  DEC Position,CR]       ' Send new position
+  ENDIF
+UpdateTout:
+DEBUG "."
+LOOP
+
+ChangeRemote:
+  Freq = Freq + 500                        ' Add 500 to received value
+  IF Freq > 5000 THEN Freq = 1000          ' limit 1000-5000
+  DEBUG CR,"Setting buzzer to frequency of:", DEC Freq
+  IF State = 1 THEN                        ' Change LED state
+    State = 0
+  ELSE
+    State = 1
+  ENDIF
+  DEBUG CR,"Setting LED to state of:       ", DEC State
+  Position = Position + 50                 ' Add 50 to servo position
+  IF position > 1000 THEN Position = 500   ' Limit 500 to 1000
+  DEBUG CR,"Setting Servo to position of:  ", DEC Position,CR
+RETURN
+
+Config_XBee:
+  ' Configure XBee for destination node address
+  PAUSE 10                                  ' Short guard time
+  SEROUT Tx,Baud,["+++"]                    ' Command Mode sequence
+  PAUSE 10                                  ' Short guard time
+  SEROUT TX,Baud,["ATDL ", HEX DL_Addr,CR]  ' Set Destination Node Address
+  SEROUT Tx,Baud,["ATCN",CR]                ' Exit Command Mode
+RETURN

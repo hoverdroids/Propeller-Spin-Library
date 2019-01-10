@@ -1,0 +1,36 @@
+' ***************************************************
+' Simple_Control_Remote.bs2
+' Receives decimal value to control buzzer and LED
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+' ***************** Variables, Constants and Pins
+Baud            CON     T9600 ' Set Baud rate
+
+Rx              PIN     15    ' XBee DOUT
+Tx              PIN     14    ' XBee DIN
+Led             PIN     0
+Buzzer          PIN     8
+Freq            VAR     Word
+
+' ***************** Main Loop
+DO
+ SERIN Rx, Baud, [DEC Freq]      ' Wait for decimal and accept
+ HIGH LED                        ' Turn on LED
+ FREQOUT Buzzer,200,Freq         ' Sound tone
+ LOW LED                         ' Turn off LED
+LOOP

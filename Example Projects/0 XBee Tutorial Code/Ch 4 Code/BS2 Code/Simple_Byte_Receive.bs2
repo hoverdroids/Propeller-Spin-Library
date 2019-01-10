@@ -1,0 +1,38 @@
+' ********************************************************
+' Simple_Byte_Receive.bs2
+' Accepts, displays and echoes back incoming bytes
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15    ' XBee DIN
+Tx              PIN     14    ' XBee Dout
+RTS             PIN     11    ' XBee RTS - Used later
+
+' ************** Variable Declarations ******************
+DataIn          VAR     Byte
+
+' ************** Main LOOP ******************************
+PAUSE 500                     ' 1/2 second pause to stabilize comms
+DEBUG "Awaiting Byte Data...",CR
+
+DO
+  SERIN Rx, Baud, [DataIn]   ' Accept incoming byte
+  SEROUT Tx, Baud, [DataIn]  ' Echo byte back
+  DEBUG DataIn               ' Display byte as character
+LOOP

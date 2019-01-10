@@ -1,0 +1,43 @@
+' ********************************************************
+' Simple_Debug.bs2
+' Sends data to remote terminal for monitoring
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     15   ' XBee DOUT
+Tx              PIN     14   ' XBee DIN
+RTS             PIN     11   ' XBee RTS
+
+' ************** Variable Declarations ******************
+Counter         VAR     Byte
+
+' ************** Main LOOP ******************************
+PAUSE 500                        ' 1/2 second pause to stabilize comms
+SEROUT Tx, Baud, [CLS,"Program Running...",CR]
+
+PAUSE 2000                       ' Pause before counting
+
+FOR Counter = 1 TO 20            ' Count and display remotely
+  SEROUT Tx, Baud, ["Counter = ", DEC Counter, CR]
+  PAUSE 100
+NEXT
+
+SEROUT Tx, Baud, ["Loop complete.",CR]
+END
+

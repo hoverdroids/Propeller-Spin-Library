@@ -1,0 +1,138 @@
+' ******************************************************
+' Automatic_Polling_Base.bs2
+' This program works with Polling_Remote.bs2
+' to automatically poll and update a range of remote
+' addresses defined by Start_Addr to End_Addr
+' Also requests and display RSSI dB level from remote node
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+' ***************** Variables, Constants and Pins
+Baud            CON     T9600  ' Set Baud rate
+
+Rx              PIN     15     ' XBee DOUT
+Tx              PIN     14     ' XBee DIN
+
+Start_Addr      CON     1      ' First node address to poll
+End_Addr        CON     3      ' Last node address to poll
+
+State           VAR     Bit    ' LED state
+Freq            VAR     Word   ' Buzzer frequency
+Position        VAR     Word   ' Servo position
+DL_Addr         VAR     Word   ' Destination address for data
+DataIn          VAR     Byte   ' General variable for data
+Light           VAR     Word   ' Returned light level
+
+' ***************** Configure XBee in AT Command Mode
+PAUSE 500
+DEBUG CLS,"Configuring XBee...",CR
+
+PAUSE 3000                        ' Guard time
+SEROUT Tx,Baud,["+++"]            ' Command Mode Sequence
+PAUSE 2000                        ' Guard time
+SEROUT Tx,Baud,["ATGT 3,MY 0",CR] ' Set low guard time & base address
+SEROUT TX,Baud,["ATCN",CR]        ' Exit Command Mode
+
+' ***************** Main Loop
+DO
+
+  FOR DL_Addr = Start_Addr TO End_Addr              ' loop through range of addresses
+     DEBUG CR,CR,"***** Starting Control of Address ",IHEX DL_Addr," *******"
+     GOSUB Config_XBee                              ' Set DL address
+     State = 1       :GOSUB LED_State   : PAUSE 200 ' Set remote LED
+     Position = 500  :GOSUB Servo_Pos   : PAUSE 200 ' Set remote servo
+     Freq = 5000     :GOSUB Buzzer_Freq : PAUSE 200 ' set remote buzzer
+     GOSUB Read_Light                   : PAUSE 200 ' Go read remote
+     GOSUB Get_dB                                   ' Go read and display dB
+     Freq = 0        :GOSUB Buzzer_Freq : PAUSE 200 ' Set remote buzzer
+     Position = 1000 :GOSUB Servo_Pos   : PAUSE 200 ' Set remote servo
+     State = 0       :GOSUB LED_State   : PAUSE 200 ' Set remote LED
+     PAUSE 2000
+   NEXT
+   DEBUG CR, CR,"********* Control All Nodes! **********"
+   DL_Addr = $FFFF                                  ' Set to control ALL nodes
+   GOSUB Config_XBee                                ' Set DL address
+     State = 1       :GOSUB LED_State   : PAUSE 200 ' Set all remote LEDs
+     Position = 500  :GOSUB Servo_Pos   : PAUSE 200 ' Set all remote servos
+     Freq = 5000     :GOSUB Buzzer_Freq : PAUSE 200 ' Set all remote buzzers
+     Freq = 0        :GOSUB Buzzer_Freq : PAUSE 200
+     Position = 1000 :GOSUB Servo_Pos   : PAUSE 200 ' Set all remote servos
+     State = 0       :GOSUB LED_State   : PAUSE 200 ' Set all remote LEDs
+     PAUSE 2000
+LOOP
+Get_dB:
+  ' Request, accept, display dB level
+  PAUSE 10                                  ' Short guard time
+  SEROUT Tx,Baud,["+++"]                    ' Command Mode sequence
+  PAUSE 10                                  ' Short guard time
+  SEROUT TX,Baud,["ATDB",CR]                ' request dB level
+  SERIN Rx,Baud,200,dB_Timeout,[HEX DataIn] ' Accept returning data
+  SEROUT Tx,Baud,["ATCN",CR]                ' Exit Command Mode
+  DEBUG CR,"                       RSSI dB = -", DEC DataIn
+dB_timeout:
+RETURN
+
+Config_XBee:
+  ' Configure XBee for destination node address
+  PAUSE 10                                  ' Short guard time
+  SEROUT Tx,Baud,["+++"]                    ' Command Mode sequence
+  PAUSE 10                                  ' Short guard time
+  SEROUT TX,Baud,["ATDL ", HEX DL_Addr,CR]  ' Set Destination Node Address
+  SEROUT Tx,Baud,["ATCN",CR]                ' Exit Command Mode
+RETURN
+
+LED_State:
+  DEBUG CR,"Setting LED to state:             ", DEC State
+  SEROUT Tx,Baud,["L",CR,CR, DEC State,CR]    ' Send data to control LED
+  GOSUB CheckAck                              ' Check for acknowledgement
+RETURN
+
+Buzzer_Freq:
+  DEBUG CR,"Setting buzzer to frequency:      ", DEC Freq
+  SEROUT Tx,Baud,["B",CR,CR, DEC Freq,CR]     ' Send data to control buzzer
+  GOSUB CheckAck                              ' Check for acknowledgement
+RETURN
+
+Servo_Pos:
+  DEBUG CR,"Setting Servo to position:        ", DEC Position
+  SEROUT Tx,Baud,["S",CR,CR, DEC Position,CR] ' Send data to control Servo
+  GOSUB CheckAck                              ' Check for acknowledgement
+RETURN
+
+Read_Light:
+  DEBUG CR,"Getting Light Level:              ", DEC DL_Addr
+  SEROUT Tx,Baud,["R",CR,CR]                  ' Send data to read remote sensor
+  SERIN  Rx,Baud,1000, Timeout,[DEC Light]    ' accept returning data
+  DEBUG  DEC light                            ' Display value
+  PAUSE 1000
+  GOTO ReadDone:
+  Timeout:                                    ' If no returned data, display
+  DEBUG " -- No Data!"
+  ReadDone:
+RETURN
+
+CheckAck:
+  SERIN Rx,Baud,1000,CheckTimeout,[DEC dataIn] ' Accept incoming byte
+  IF dataIn = 1 THEN                           ' If 1, then ack'd
+    DEBUG BELL,"OK - Ack Received!",CR
+  ELSE                                         ' If received, but not "1", problem
+    DEBUG "Bad Ack!",CR
+  ENDIF
+  RETURN
+CheckTimeout:
+  DEBUG "No ack received!",CR                  ' If nothing recieved
+RETURN

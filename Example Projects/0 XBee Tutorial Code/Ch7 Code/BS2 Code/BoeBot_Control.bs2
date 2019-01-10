@@ -1,0 +1,158 @@
+' ********************************************************
+' BoeBot_Control.bs2
+' Remote Boe-Bot Control using joystick and button
+' Map using StampPlot or display in DEBUG window
+' the angle and distance
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+Rx              PIN     11     ' XBee DOUT
+Tx              PIN     10     ' XBee DIN
+RTS             PIN     9      ' XBee /RTS
+
+UD_Pin          PIN     4      ' Stick Up-Down Pin
+LR_Pin          PIN     6      ' Stick Left-Right Pin
+Buzzer          PIN     15     ' Buzzer pin
+PB              PIN     5      ' Pushbutton
+
+LR              VAR     Byte   ' Stick Left-Right Value
+UD              VAR     Byte   ' Stick Up-Down Value
+UD_C            VAR     Byte   ' Up-down center data
+LR_C            VAR     Byte   ' Left-Right center DATa
+First_Read      VAR     Bit    ' Flag to indicate 1st read for centers
+R_Drive         VAR     Word   ' Right Drive Value
+L_Drive         VAR     Word   ' Left Drive Value
+DataIn          VAR     Byte   ' Incoming byte
+Angle           VAR     Word   ' Angle of bot
+D_Angle         VAR     Word   ' Calculated drawing angle
+Inches          VAR     Word   ' Ping inches
+Ping_Pos        VAR     Word   ' Ping Angle
+Ping_New        VAR     Word   ' New Ping position to bot
+Counter         VAR     Byte   ' General Counter
+' ************** Configuration *********************
+PAUSE 500
+DEBUG "!NEWP",CR                    ' New plot
+DEBUG "!POBJ Clear",CR              ' Clear object
+DEBUG "!TITL Boe-Bot Navigation",CR ' Title plot
+DEBUG "!PLOT ON",CR                 ' Enable plotting
+DEBUG "!TMAX 120",CR                ' set up max time (X axis)
+DEBUG "!TMIN -120",CR               ' Set min time
+DEBUG "!XLBL Inches",CR             ' Label Y Axis
+DEBUG "@VPG1",CR                    ' View page 1
+    ' **** Constant Drawings ****
+DEBUG "@DWTH 5",CR                  ' Draw width
+DEBUG "@CIRC 50a,50a,12,(Green)",CR ' Draw circles - 1 foot
+DEBUG "@CIRC 50a,50a,36,(Green)",CR '                3 foot
+DEBUG "@CIRC 50a,50a,72,(Green)",CR '                6 foot
+DEBUG "@FREC -140,-2,-121,270,(white)",CR ' Cover Y Axis
+DEBUG "~CPY0",CR
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["+++"]              ' Command mode sequence
+PAUSE 2000                          ' Guard Time
+SEROUT Tx,Baud,["ATD6 1,CN",CR]     ' RTS enable (D6 1)
+                                    ' Exit Command Mode (CN)
+
+' ************** Main Loop ***********************
+DO
+
+  GOSUB Read_Stick                  ' Read joystick
+  GOSUB EmptyBuffer                 ' Ensure buffer empty
+  IF PB = 1 THEN                    ' If pressed, send PING position
+    SEROUT Tx,Baud,["P",CR,CR,DEC Ping_New,CR,CR]
+  ELSE                              ' Not pressed, send drive
+    SEROUT Tx,Baud,["D",CR,CR,DEC R_Drive,CR,CR,DEC L_Drive,CR,CR]
+  ENDIF
+
+Counter = 0
+ReadAgain:
+  SERIN Rx\RTS,Baud,10,Timeout,[DataIn]             ' Get returned data
+  IF DataIn = "!" THEN                              ' IF good start, accept rest
+     SERIN Rx\RTS,Baud,20,Timeout,[DEC Inches]      ' Get inches
+     SERIN Rx\RTS,Baud,20,Timeout,[DEC Angle]       ' Get Angle
+     SERIN Rx\RTS,Baud,20,Timeout,[DEC Ping_Pos]    ' Get Ping Position
+     FREQOUT Buzzer,50,(146-Inches) * 35            ' Sound buzzer
+     GOSUB Update_StampPlot                         ' Update StampPlot
+   '  GOSUB Show_Debug                              ' If no StampPlot, update DEBUG
+     GOTO ReadDone
+   ENDIF
+Timeout:                                            ' In case not delimiter,
+  Counter = Counter + 1                             ' read 50 characters to find
+  IF Counter < 50 THEN GOTO ReadAgain               ' if delimiter in buffer
+ReadDone:                                           ' and give time for data
+LOOP
+
+' ***************** Subroutines ******************
+Read_Stick:
+  HIGH UD_Pin                       ' Charge cap
+  PAUSE 2
+  RCTIME UD_Pin, 1, UD              ' Read stick
+
+  HIGH LR_Pin                       ' Charge Cap
+  PAUSE 2
+  RCTIME LR_Pin, 1, LR              ' Read stick
+  IF First_Read = 0 THEN            ' If first read of joystick
+    UD_C = UD                       ' store center positions
+    LR_C = LR
+    First_Read = 1                  ' mark as centers read
+  ENDIF
+  ' Mix Up-down and Left-right to determine drive values, limit ranges
+  R_Drive = 750 - ((UD - UD_C) * 3)+ (LR - LR_C) MIN 300 MAX 1200
+  L_Drive = 750 + ((UD - UD_C) * 3)+ (LR - LR_C) MIN 300 MAX 1200
+  Ping_New = 750 - ((LR - LR_C)*10) MIN 300 MAX 1200    ' Calculate position
+
+RETURN
+
+Show_Debug:   ' show data in DEBUG Terminal
+    DEBUG CLS," Angle = ",DEC Angle,
+              " Distance = ",DEC Inches,CR,
+              " Left Drv = ", DEC L_Drive,
+              " Right Drv = ", DEC R_Drive,
+              " Ping Pos = ", DEC Ping_Pos
+RETURN
+
+Update_StampPlot:  ' Show data in StampPlot
+ DEBUG "!STAT Left Drv = ", DEC L_Drive,    ' Place values in status box
+       "   Right Drv = ", DEC R_Drive,
+       "   Ping Pos = ", DEC Ping_Pos,CR
+ IF PB = 0 THEN                             ' If PB not pressed, clear
+     DEBUG "!RSET",CR                       ' reset plot
+                                            ' Place text
+     DEBUG "~TEXT 40a,100a,2a,(Blue),Bot Angle: ",DEC Angle,CR
+     DEBUG "~TEXT 40a,5a,2a,(Blue),Distance:  ",DEC Inches,CR
+
+     D_Angle = 360 - Angle -90              ' Calculate bot drawing angle
+                                            ' draw pie based on angle
+     DEBUG "~DPIE 50a, 50a, 5a,",SDEC D_Angle-10,",",SDEC D_Angle+10,",(Black)",CR
+ ENDIF
+
+ IF Ping_Pos > 750 THEN                     ' Calculate angle of bot + ping
+    D_Angle = 360- Angle + 90 + (Ping_Pos - 750 / 5)
+ ELSE
+    D_Angle = 360- Angle + 90 - (750 - Ping_Pos / 5)
+ ENDIF
+                                            ' Draw arc for ping point
+ DEBUG "~DARC 50a, 50a,", DEC Inches,",",
+    SDEC D_Angle-1,",",SDEC D_Angle+1,",(Red)",CR
+ DEBUG "~CPY0",CR                           ' copy image to page 1 for viewing
+RETURN
+
+EmptyBuffer:
+     SERIN 12\10,Baud,5,Done,[datain]       ' loop until buffer empty
+     GOTO EmptyBuffer
+Done:
+RETURN

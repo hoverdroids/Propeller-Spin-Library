@@ -1,0 +1,111 @@
+' ******************************************************
+' Polling_Remote.bs2
+' This program accepts a character and values:
+'   - L & 0 or 1 to control state of LED
+'   - B & value to control buzzer frequency
+'   - S & value to control servo position
+'   - R to return value of light sensor
+' Return acknowledgements or value to base
+' The address of node may be set by changing MY_Addr value
+' Requires 802.15.4 XBee (Series 1)
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+
+'****************** Variable, Constants and Pins
+Baud            CON     T9600
+
+LED             PIN     0
+Buzzer          PIN     8
+PhotoT          PIN     5
+Servo           PIN     12
+
+Rx              PIN     15   ' XBee DOUT
+Tx              PIN     14   ' XBee DIN
+RTS             PIN     11   ' XBee RTS
+
+Freq            VAR     Word ' Received frequency for buzzer
+State           VAR     Bit  ' Received state of LED
+DataIn          VAR     Byte ' General byte data
+Light           VAR     Word ' Measured light level
+Position        VAR     Word ' Received servo position
+
+My_Addr         CON     $2   ' Set address of node, modify as desired, $1-$FFFE
+
+' ***************** Configure XBee to use RTS and set Address
+Position = 750
+
+PAUSE 500
+DEBUG CLS,"Configuring XBee...",CR
+PAUSE 3000                      ' Guard time
+SEROUT Tx,Baud,["+++"]          ' Command Mode Sequence
+PAUSE 2000                      ' Guard time
+SEROUT Tx,Baud,["ATD6 1",CR]    ' Enable RTS
+SEROUT Tx,Baud,["ATMY ", HEX My_Addr,CR]  ' Set node address
+SEROUT Tx,Baud,["ATDL 0,CN",CR] ' Set destination address of base
+                                ' & Exit Command Mode
+' ***************** Main Loop
+DO
+  GOSUB AcceptData
+  GOSUB Control
+LOOP
+
+AcceptData:
+  SERIN Rx\RTS,Baud,10,Timeout,[DataIn]       ' Accept byte
+  SELECT DataIn
+    CASE "L"                                  ' L to control LEF
+      SERIN Rx\RTS,Baud,1000,Timeout,[DEC State]' Accept LED state
+      PAUSE 200                               ' Give base time to set up
+      SEROUT Tx,Baud,[CR,DEC 1,CR]            ' Return acknowledgment
+
+    CASE "B"                                  ' B to set Buzzer
+      SERIN Rx\RTS,Baud,1000,Timeout,[DEC Freq] ' Accept buzzer frequency
+      PAUSE 200                               ' Give base time to set up
+      SEROUT Tx,Baud,[CR,DEC 1,CR]            ' Return acknowledgment
+
+    CASE "S"                                  ' S to control Servo
+      SERIN Rx\RTS,Baud,1000,Timeout,[DEC Position]' Accept position
+      PAUSE 200
+      SEROUT Tx,Baud,[CR,DEC 1,CR]            ' Return acknowledgment
+
+    CASE "R"                                  ' R to read light sensor
+      HIGH PhotoT                             ' Use RCTime to get value
+      PAUSE 5
+      RCTIME PhotoT,1,Light
+      PAUSE 100                               ' Give base time to set up
+      SEROUT Tx, Baud,[DEC Light,CR]          ' Send value to base
+   ENDSELECT
+Timeout:
+RETURN
+
+Control:
+  IF State = 1 THEN                          ' Control LED based on state
+    HIGH LED
+  ELSE
+    LOW LED
+  ENDIF
+
+  IF Freq <> 0 THEN                          ' Control Buzzer based on Freq
+    FREQOUT Buzzer,50,Freq
+  ELSE
+    PAUSE 100
+  ENDIF
+
+  FOR DataIn = 1 TO 20                       ' Control Servo based on Position
+    PULSOUT Servo, Position
+    PAUSE 20
+  NEXT
+RETURN

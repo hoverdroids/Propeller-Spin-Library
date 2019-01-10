@@ -1,0 +1,167 @@
+' ********************************************************
+' Wireless_Joystick_BoeBot.bs2
+' Remotely controlled Boe_Bot
+' ********************************************************
+' Martin Hebel, Electronic Systems Technologies, SIUC
+' Version 1.0
+' ********************************************************
+
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+
+' *************** Constants & PIN Declarations ***********
+#SELECT $STAMP
+  #CASE BS2, BS2E, BS2PE
+    T9600       CON     84
+  #CASE BS2SX, BS2P
+    T9600       CON     240
+  #CASE BS2PX
+    T9600       CON     396
+#ENDSELECT
+Baud            CON     T9600
+
+' ******* XBee **********
+Rx              PIN     11      ' XBee DOUT
+Tx              PIN     10      ' XBee DIN
+RTS             PIN     9       ' XBee /RTS
+
+' ****** ServoPal *******
+nInp            PIN     12      'Define the input pin.
+Alarm           PIN     13      'Define the alarm pin.
+
+' ****** PING)) *********
+#SELECT $STAMP
+  #CASE BS2, BS2E
+    Trigger     CON     5       ' trigger pulse = 10 uS
+    Scale       CON     $200    ' raw x 2.00 = uS
+  #CASE BS2SX, BS2P, BS2PX
+    Trigger     CON     13
+    Scale       CON     $0CD    ' raw x 0.80 = uS
+  #CASE BS2PE
+    Trigger     CON     5
+    Scale       CON     $1E1    ' raw x 1.88 = uS
+#ENDSELECT
+Ping            PIN     15
+
+inches          VAR     Word
+rawDist         VAR     Word
+
+RawToIn         CON     889                  ' 1 / 73.746 (with **)
+RawToCm         CON     2257                 ' 1 / 29.034 (with **)
+
+IsHigh          CON     1                    ' for PULSOUT
+IsLow           CON     0
+
+' ******** HM55B Compass *******
+DinDout        PIN      2                    ' P6 transceives to/from Din/Dout
+Clk            PIN      5                    ' P5 sends pulses to HM55B's Clk
+En             PIN      4                    ' P4 controls HM55B's /EN(ABLE)
+
+Reset          CON      %0000                ' Reset command for HM55B
+Measure        CON      %1000                ' Start measurement command
+Report         CON      %1100                ' Get status/axis values command
+Ready          CON      %1100                ' 11 -> Done, 00 -> no errors
+NegMask        CON      %1111100000000000    ' For 11-bit negative to 16-bits
+
+x              VAR      Word                 ' x-axis data
+y              VAR      Word                 ' y-axis data
+status         VAR      Nib                  ' Status flags
+angle          VAR      Word                 ' Store angle measurement
+
+' ******** General Data ********
+DataIn          VAR     Byte                 ' Incoming byte
+Ping_Pos        VAR     Word                 ' Ping servo position
+R_Drive         VAR     Word                 ' Right Drive
+L_Drive         VAR     Word                 ' Left Drive
+counter         VAR     Byte                 ' General counter
+
+' ************** XBee Configuration *********************
+PAUSE 500
+PAUSE 2000                                   ' Guard Time
+SEROUT Tx,Baud,["+++"]                       ' Command mode sequence
+PAUSE 2000                                   ' Guard Time
+SEROUT Tx,Baud,["ATD6 1,CN",CR]              ' RTS enable (D6 1)
+                                             ' Exit Command Mode (CN)
+
+' **** Initialize ServoPal *****
+INPUT nInp                   'Make sure nInp isn't being driven.
+DO UNTIL nInp                'Wait for ServoPAL to power up.
+LOOP
+LOW nInp                     'Set pin to an output and hold it low
+PAUSE 100                    'for 100mS.
+HIGH nInp                    'Raise the pin.
+Ping_Pos = 750
+GOSUB EmptyBuffer            ' Empty XBee buffer
+
+' ************** Main LOOP ******************************
+DO
+  SERIN Rx\RTS,Baud,10,TimeOut,[DataIn]         ' Briefly wait for delimiter
+  IF DataIn = "D" THEN                          ' If ! delimiter, get data
+    SERIN Rx\RTS,Baud,10,TimeOut,[DEC R_Drive]  ' Accept Right wheel value
+    SERIN Rx\RTS,Baud,10,TimeOut,[DEC L_Drive]  ' Accept Left wheel value
+    PULSOUT nInp,R_Drive                        ' Set ServoPals
+    PULSOUT nInp,L_Drive
+    counter = 0                                 ' Clear counter for no-data timeout
+    GOSUB SendData                              ' Send data to control
+  ENDIF
+
+  IF DataIn = "P" THEN                          ' If p delimiter, get data
+    SERIN Rx\RTS,Baud,10,TimeOut,[DEC Ping_Pos] ' Accept Ping servo value
+    PULSOUT nInp,2000                           ' Stop bot
+    PULSOUT nInp,2000
+    GOSUB SendData                              ' Send data to base
+  ENDIF
+Timeout:
+  counter = counter + 1                         ' If timeout, add 1
+  IF counter = 50 THEN                          ' If no new data in 50 cycles, stop
+    PULSOUT nInp,2000
+    PULSOUT nInp,2000
+  ENDIF
+  PULSOUT 14,Ping_Pos                           ' Set Ping servo position
+  PAUSE 10
+LOOP
+' ************* Subroutines ********************
+SendData:
+  GOSUB Get_Sonar                               ' get sensor value
+  GOSUB Get_Compass                             ' Get compass Angle
+                                                ' Send data to control
+  SEROUT Tx,Baud,["!",CR,CR,DEC Inches,CR,CR,DEC Angle,CR,CR,DEC Ping_Pos,CR]
+RETURN
+
+EmptyBuffer:
+  SERIN Rx\RTS,Baud,10,Done,[DataIn]            ' loop until buffer empty
+  GOTO EmptyBuffer
+Done:
+RETURN
+
+Get_Sonar:
+  Ping = IsLow                                  ' make trigger 0-1-0
+  PULSOUT Ping, Trigger                         ' activate sensor
+  PULSIN  Ping, IsHigh, rawDist                 ' measure echo pulse
+  rawDist = rawDist */ Scale                    ' convert to uS
+  rawDist = rawDist / 2                         ' remove return trip
+  inches = rawDist ** RawToIn                   ' convert to inches
+  RETURN
+
+Get_Compass:                                    ' Compass module subroutine
+  HIGH En: LOW En                               ' Send reset command to HM55B
+  SHIFTOUT DinDout,clk,MSBFIRST,[Reset\4]
+
+  HIGH En: LOW En                               ' HM55B start measurement command
+  SHIFTOUT DinDout,clk,MSBFIRST,[Measure\4]
+  status = 0                                    ' Clear previous status flags
+
+  DO                                            ' Status flag checking loop
+    HIGH En: LOW En                             ' Measurement status command
+    SHIFTOUT DinDout,clk,MSBFIRST,[Report\4]
+    SHIFTIN  DinDout,clk,MSBPOST,[Status\4]     ' Get Status
+  LOOP UNTIL status = Ready                     ' Exit loop when status is ready
+
+  SHIFTIN  DinDout,clk,MSBPOST,[x\11,y\11]      ' Get x & y axis values
+  HIGH En                                       ' Disable module
+
+  IF (y.BIT10 = 1) THEN y = y | NegMask         ' Store 11-bits as signed word
+  IF (x.BIT10 = 1) THEN x = x | NegMask         ' Repeat for other axis
+  angle = x ATN -y                              ' Convert x and y to brads
+  angle = angle */ 360 + 90 // 360              ' Convert brads to degrees
+RETURN
