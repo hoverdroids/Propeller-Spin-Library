@@ -76,7 +76,7 @@ VAR
   long bufsize
   long addr_txflag
 
-PUB init(BufferAddress, BufferSize, addr_tx_flag)                                              'From REF1
+PUB init(BufferAddress, BufferSize, addr_tx_flag) 'From REF1
 {
   Descr : Call this method from your main code before using this object. It will initialize
           the output buffer that is used for transmitting data from the this Virtual uController

@@ -2,7 +2,7 @@
 
 ======================================================================
  
-  Copyright (C) 2016 HoverDroids(TM)
+  Copyright (C) 2016 - 2019 HoverDroids(TM)
 
   Licensed under the Creative Commons Attribution-ShareAlike
   International License, Version 4.0 (the "License");
@@ -21,15 +21,15 @@
 
    File...... (HoverDroids) FullDuplexSerial.spin
    Purpose... A serial object for full duplex serial transmission between
-              devices.
+              devices, that is an aggregate of all other variations of the
+              FullDuplexSerial objects on OBEX.
    Author.... Chris Sprague
    E-mail.... HoverDroids@gmail.com
-   Started... 08 09 2016
-   Updates... 08 09 2016
+
+   Version History
+   1.0          08 09 2016
    
 ======================================================================
-
-----------------------------------------------------------------------
 Derived from 
 ----------------------------------------------------------------------
   (REF1)  FullDuplexSerial
@@ -40,8 +40,7 @@ Derived from
   (REF6)  Parallax Serial Terminal
   (REF7)  pcFullDuplexSerial
 
-  Different usage of references in code are list off the right side of the screen
-  with the following format:
+  References are noted with the following format:
 
   [X]REF1 [ ]REF3               A version of the method is in found in
                                 REF1 & REF3. The REF1 is used instead.
@@ -52,6 +51,11 @@ Derived from
 ----------------------------------------------------------------------
 Program Description
 ----------------------------------------------------------------------
+  COGS  USED:   TODO
+  CTRAs USED:   TODO
+  CTRBs USED:   TODO
+  STACK SIZE:   TODO
+
   This is a compilation of many of the most popular serial objects on
   OBEX. The objective is to have a single serial object that works for
   all of the state purposes. This isn't difficult because most objects
@@ -64,7 +68,7 @@ Usage
   To use this object in your code, declare it as shown below:
 
   OBJ
-  terminal: "(HoverDroids) FullDuplexSerialExt"
+  terminal: "(HoverDroids) FullDuplexSerial"
 
   SomeMethod
   terminal.objMethod(input1,...,inputN)
@@ -88,6 +92,7 @@ Usage Notes
   Hence, this aggregation of code will certainly increase the size of your
   binary to an unnecessary degree.
 }
+
 OBJ
   strings:"(HoverDroids) String Utils"
 
