@@ -19,12 +19,14 @@
 
 ======================================================================
 
-   File...... (HoverDroids) SerialPorts 32Byte x4.spin
-   Purpose... Provide full duplex serial communications for 1 to 4 serial ports, in a more
-              or less transparent way, so you have COM0 to COM3 to deal with instead.
+   File         (HoverDroids) SerialPorts 32Byte x4.spin
+   Author       Chris Sprague
+   E-mail       HoverDroids@gmail.com
+   Website      HoverDroids.com
 
-   Author.... Chris Sprague
-   E-mail.... HoverDroids@gmail.com
+   Brief Description:
+     Provide full duplex serial communications for 1 to 4 serial ports, in a more
+     or less transparent way, so you have COM0 to COM3 to deal with instead.
 
    Version History
    1.0          01 10 2019
@@ -33,6 +35,7 @@
 Derived from
 ----------------------------------------------------------------------
   (REF1)  TwelveSerialPorts32
+  (REF2)  SerialPortBank0/1/2
 
   References are noted with the following format:
 
@@ -43,7 +46,7 @@ Derived from
   [M]REF1                       REF1 has modified this line vs other versions
 
 ----------------------------------------------------------------------
-Program Description
+Description
 ----------------------------------------------------------------------
   COGS  USED:   1
   CTRAs USED:   TODO
@@ -52,16 +55,26 @@ Program Description
   RX Buffer :   32Byte
   TX Buffer :   16Byte
 
+  Baud rates per port in each COG:
+  1 port up to 750kbps
+  2 port up to 230kbps
+  3 port up to 140kbps
+  4 port up to 100kbps          Tested 4 ports to 115Kbps with 6MHz crystal
+
   Provide full duplex serial communications for 1 to 4 serial ports, in a more
   or less transparent way, so you have COM0 to COM3 to deal with instead.
+
+  This is merely a wrapper for several "SerialPorts PByte Banks M-N" objects.
 
   This differs from REF1 in formatting, OBJ reference naming, and reduction of
   ports from 12 to 4. Use any of the following objects for a different number
   of ports and buffer sizes (as well as # of cogs required):
+
         1COG                       2COGs                      3COGs
         - SerialPorts 32Byte x4    - SerialPorts 32Byte x8    - SerialPorts 32Byte x12
         - SerialPorts 128Byte x4   - SerialPorts 128Byte x8   - SerialPorts 128Byte x12
         - SerialPorts 512Byte x4   - SerialPorts 512Byte x8   - SerialPorts 512Byte x12
+
 ----------------------------------------------------------------------
 Usage
 ----------------------------------------------------------------------
@@ -104,111 +117,154 @@ CON
   SECONDARY_BUFFER_SIZE = 256
 
 OBJ
-  com0:"SerialPortBank0"
+  com0:"(HoverDroids) SerialPorts 32Byte Banks 0-3"
 
 VAR
   long bb
 
-PUB AddPortNoHandshake(port,rxpin,txpin,mode,baudrate) ' for compatibility with fullduplexserial
+PUB AddPortNoHandshake(port,rxpin,txpin,mode,baudrate)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   return AddPort(port,rxpin,txpin,-1,-1,0,mode,baudrate)
 
-PUB AddPort(port,rxpin,txpin,ctspin,rtspin,rtsthreshold,mode,baudrate)
-    bb := (port >> 2)
+PUB AddPort(port,rxpin,txpin,ctspin,rtspin,rtsthreshold,mode,baudrate)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
   if (bb == 0)
     return com0.AddPort((port & 3),rxpin,txpin,ctspin,rtspin,rtsthreshold,mode,baudrate)
-  else
-    return -1
 
-PUB Start
+PUB Start  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   result:=com0.start
-  result*=10
 
-PUB Stop
+PUB Stop  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   com0.stop
 
-PUB getCogID(port)
+PUB getCogID(port)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.getCogID
-  else
-    return com2.getCogID
 
-PUB rxflush(port)
+PUB rxflush(port)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.rxflush((port & 3))
-  else
-    return -1
 
-PUB rxcheck(port) : rxbyte
+PUB rxcheck(port) : rxbyte  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.rxcheck((port & 3))
-  else
-    return -1
 
-PUB rxtime(port,ms) : rxbyte 
+PUB rxtime(port,ms) : rxbyte  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.rxtime((port & 3),ms)
-  else
-    return -1
 
-PUB rx(port) : rxbyte
+PUB rx(port) : rxbyte  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.rx((port & 3))
-  else
-    return -1
 
-PUB tx(port,txbyte)
+PUB tx(port,txbyte)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.tx((port & 3),txbyte)
-  else
-    return -1
 
-PUB txflush(port)
+PUB txflush(port)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.txflush((port & 3))
-  else
-    return -1
 
-PUB str(port,stringptr)
+PUB str(port,strAddr)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
-    return com0.str((port & 3),stringptr)
-  else
-    return -1
+    return com0.str((port & 3),strAddr)
 
-PUB dec(port,value) 
+PUB strln(port,strAddr)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.strln((port & 3),strAddr)
+
+PUB dec(port,value)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.dec((port & 3),value)
-  else
-    return -1
 
-PUB hex(port,value, digits)
+PUB decx(port,value, digits) | i  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.decx((port & 3),value)
+
+PUB decl(port,value,digits,flag) | i, x  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.decl((port & 3),value)
+
+PUB hex(port,value, digits)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.hex((port & 3),value,digits)
-  else
-    return -1
 
-PUB bin(port,value, digits)
+PUB ihex(port,value, digits)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.ihex((port & 3),value,digits)
+
+PUB bin(port,value, digits)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
     return com0.bin((port & 3),value,digits)
-  else
-    return -1
 
-PUB newline(port)
+PUB padchar(port, count, txbyte)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
   bb := (port >> 2)
   if bb == 0
-    return com0.str((port & 3),@crlf)
-  else
-    return -1
+    return com0.padchar((port & 3), count, txbyte)
 
-dat
-crlf byte 13,10,0
+PUB ibin(port,value, digits)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.ibin((port & 3),value,digits)
+
+PUB putc(port,txbyte)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.putc((port & 3),txbyte)
+
+PUB newline(port)  'REF1
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.newline((port & 3))
+
+PUB cls(port)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.cls((port & 3))
+
+PUB getc(port)  'REF2
+{ Method Info in (HoverDroids) SerialPorts PByte Banks M-N }
+  bb := (port >> 2)
+  if bb == 0
+    return com0.getc((port & 3))
+
+DAT
+  crlf byte 13,10,0
